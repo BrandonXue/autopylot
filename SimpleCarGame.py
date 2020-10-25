@@ -27,13 +27,14 @@ def main():
     black = 0, 0, 0
     blue = 0, 0, 255
     green = 0, 255, 0
+    red = 255, 0, 0
     
     #object position    x, y
     abs_pos = np.array([0, 0])
+    obj_pos_test = np.array([100, 100])
     
     #viewport position needs to center on object
     view_pos = np.array([0, 0])
-    viewport_sizenp = np.array([1080, 720], dtype=int)
 
     while True:
         #update events
@@ -65,9 +66,11 @@ def main():
            
         view_pos = adjust_viewport_position(map_size, viewport_size, view_pos)
         rel_pos = get_relative_coordinates(abs_pos, view_pos, viewport_size)
+        rel_o_pos = get_relative_coordinates(obj_pos_test, view_pos, viewport_size)
         
         #prepare position of main object
         test_rect = pygame.Rect(rel_pos[0],rel_pos[1], 10, 10)
+        test_static = pygame.Rect(rel_o_pos[0], rel_o_pos[1],100,100)
         
         #test_rect = test_rect.clamp(screen_rect)
         
@@ -76,6 +79,7 @@ def main():
         
         #render
         pygame.draw.rect(viewport, blue, test_rect)
+        pygame.draw.rect(viewport, red, test_static)
         
         #swap buffers
         pygame.display.flip()
