@@ -23,10 +23,18 @@ def rotate_around_player(player_pos, obj_pos, rotation)->np.array:
     rotated_position = rotation_matrix.dot(temp_vec) + player_pos
     return rotated_position
     
+def clamp(value, min, max):
+    if value > max:
+        value = max
+    elif value < min:
+        value = min
+    return value
+
 class rectangle:
     def __init__(self, x=0, y=0, width=10, height=10):
         self.coordinates_ = np.array([[x, y],[x+width, y], [x+width, y+height], [x, y+height]], dtype=float)
         self.center_ = np.array([x+width/2,y+height/2], dtype=float)
+        self.front_center_ = np.array([x+width/2, y], dtype=float)
         
     def get_coords(self, point_of_rotation, view_position, viewport_size, rotation):
         new_coords = np.array([rotate_around_player(point_of_rotation, [x, y], rotation) for [x,y] in self.coordinates_])
@@ -36,9 +44,13 @@ class rectangle:
     def move(self, move_values:np.array(2) = np.array([0.,0.])):
         self.coordinates_ += move_values
         self.center_ += move_values
+        self.front_center_ += move_values
         
     def get_center(self):
         return self.center_
+        
+    def get_front_center(self):
+        return self.front_center_
 
 def main():
     pygame.init()
@@ -56,6 +68,9 @@ def main():
     red = 255, 0, 0
     
     rotation = 0.0
+    velocity = 0.0
+    acceleration = 0.005
+    pressed = False
     
     #object position    x, y
     abs_pos = np.array([0, 0])
@@ -83,31 +98,33 @@ def main():
             
         #game logic
         move = np.array([0., 0.])
-        
         rads = radians(rotation)
         
-        if keys[pygame.K_w]:    
-            #if player_test.get_center()[1] == view_pos[1]: view_pos[1] -= 1
-            #move[1] -= 1
-            move[0] -= sin(rads) * 0.5
-            move[1] -= cos(rads) * 0.5
+        if keys[pygame.K_w]:
+            velocity -= acceleration
+            pressed=True
             
         if keys[pygame.K_s]:
-            #if player_test.get_center()[1] == view_pos[1]: view_pos[1] += 1
-            #move[1] += 1
-            move[0] += sin(rads) * 0.5
-            move[1] += cos(rads) * 0.5
+            velocity += acceleration 
+            pressed=True
             
         if keys[pygame.K_a]:
-            #if abs_pos[0] == view_pos[0]: view_pos[0] -= 1
-            #abs_pos[0] -= 1
             rotation+=0.1
             
         if keys[pygame.K_d]:
-            #if abs_pos[0] == view_pos[0]: view_pos[0] += 1
-            #abs_pos[0] += 1
             rotation-=0.1
-           
+            
+        velocity = clamp(velocity, -2., 2.)
+        move[0] += sin(rads) * velocity
+        move[1] += cos(rads) * velocity
+        
+        if not pressed:
+            if velocity > 0.0: velocity -= acceleration
+            elif velocity < 0.0: velocity += acceleration
+            if velocity < 0.002 and velocity > -0.002: velocity = 0.0
+                
+        pressed = False
+        
         player_test.move(move)
         view_pos += move
         
@@ -115,7 +132,7 @@ def main():
         viewport.fill(black)
         
         #render
-        pygame.draw.polygon(viewport, blue, player_test.get_coords(player_test.get_center(), view_pos, viewport_size, 0))
+        pygame.draw.polygon(viewport, blue, player_test.get_coords(player_test.get_front_center(), view_pos, viewport_size, 0))
         for object in objects:
             pygame.draw.polygon(viewport, green, object.get_coords(player_test.get_center(), view_pos, viewport_size, rotation))
         
