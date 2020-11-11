@@ -1,6 +1,6 @@
 import sys, pygame
 import numpy as np
-from math import sqrt, radians, sin, cos
+from math import sqrt, radians, sin, cos, exp, fabs
 from random import randint
 
 def get_relative_coordinates(abs_pos, view_pos, viewport_size)->np.array:
@@ -54,7 +54,8 @@ class rectangle:
 
 def main():
     pygame.init()
-    keys = np.array([False]*1024)
+    KEY_ARRAY_SIZE = 1024
+    keys = np.array([False]*KEY_ARRAY_SIZE)
     viewport_size = width, height = 1080, 720
     viewport = pygame.display.set_mode(viewport_size)
     screen_rect = viewport.get_rect()
@@ -68,9 +69,12 @@ def main():
     red = 255, 0, 0
     
     rotation = 0.0
+    angular_velocity = 0.0 # Can think of this as steering wheel position
     velocity = 0.0
     acceleration = 0.005
     pressed = False
+
+    MAX_VELOCITY_MAGNITUDE = 2.0
     
     #object position    x, y
     abs_pos = np.array([0, 0])
@@ -90,10 +94,10 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
             
-            if event.type == pygame.KEYDOWN:
+            if event.type == pygame.KEYDOWN and event.key < KEY_ARRAY_SIZE:
                 keys[event.key] = True
             
-            if event.type == pygame.KEYUP:
+            if event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
                 keys[event.key] = False
             
         #game logic
@@ -108,20 +112,34 @@ def main():
             velocity += acceleration 
             pressed=True
             
-        if keys[pygame.K_a]:
-            rotation+=0.1
+        # Turning left only
+        if keys[pygame.K_a] and not keys[pygame.K_d]:
+            angular_velocity = clamp(angular_velocity+0.002, -0.4, 0.4)
+
+        # Turning right only 
+        elif keys[pygame.K_d] and not keys[pygame.K_a]:
+            angular_velocity = clamp(angular_velocity-0.002, -0.4, 0.4)
+
+        # Else either both pressed or neither pressed. Move wheel towards center.
+        else:
+            if angular_velocity < 0.001 and angular_velocity > -0.001: angular_velocity = 0.0
+            if angular_velocity != 0.0: angular_velocity *= 0.985
             
-        if keys[pygame.K_d]:
-            rotation-=0.1
-            
-        velocity = clamp(velocity, -2., 2.)
+        # Only turn if car is in motion
+        if velocity != 0:
+            # Make turn speed dependent on velocity
+            rotation -= angular_velocity * velocity
+
+        velocity = clamp(velocity, -MAX_VELOCITY_MAGNITUDE, MAX_VELOCITY_MAGNITUDE)
         move[0] += sin(rads) * velocity
         move[1] += cos(rads) * velocity
         
         if not pressed:
-            if velocity > 0.0: velocity -= acceleration
-            elif velocity < 0.0: velocity += acceleration
-            if velocity < 0.002 and velocity > -0.002: velocity = 0.0
+            # if velocity > 0.0: velocity -= acceleration
+            # elif velocity < 0.0: velocity += acceleration
+            # if velocity < 0.002 and velocity > -0.002: velocity = 0.0
+            if velocity < 0.01 and velocity > -0.01: velocity = 0.0
+            if velocity != 0: velocity *= 0.99
                 
         pressed = False
         
