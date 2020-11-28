@@ -1,4 +1,5 @@
 import sys, pygame
+from pygame import transform
 import numpy as np
 import pygame.freetype
 from math import sqrt, radians, sin, cos
@@ -60,6 +61,9 @@ def main():
     half_viewport_size = np.array(viewport_size)/2
     viewport = pygame.display.set_mode(viewport_size)
     screen_rect = viewport.get_rect()
+    
+    test_surface = pygame.Surface([500, 300], pygame.SRCALPHA)
+    test_surface.fill((200,200,200))
     
     identity_mat = np.array([[1,0],[0,1]])
     
