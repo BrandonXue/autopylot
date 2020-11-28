@@ -1,3 +1,5 @@
+from config import *
+from rgb_colors import *
 import sys, pygame
 import tensorflow as tf
 from tensorflow import keras
@@ -48,32 +50,20 @@ class rectangle:
 
 def main():
     pygame.init()
-    KEY_ARRAY_SIZE = 1024
     keys = np.array([False]*KEY_ARRAY_SIZE)
-    viewport_size = width, height = 1080, 720
-    viewport = pygame.display.set_mode(viewport_size)
+    viewport = pygame.display.set_mode(VIEWPORT_SIZE)
+    half_viewport = np.array(VIEWPORT_SIZE)/2
     screen_rect = viewport.get_rect()
-    
-    map_size = width, height = 2000, 2000
-    
-    #some colors
-    black = 0, 0, 0
-    blue = 0, 0, 255
-    green = 0, 255, 0
-    red = 255, 0, 0
     
     rotation = 0.0
     angular_velocity = 0.0 # Can think of this as steering wheel position
     velocity = 0.0
-    acceleration = 0.005
     pressed = False
-
-    MAX_VELOCITY_MAGNITUDE = 2.0
     
     #object position    x, y
     abs_pos = np.array([0, 0])
     
-    player_test = rectangle(0, 0, 20, 40)
+    player_test = rectangle(0, 0, CAR_WIDTH, CAR_HEIGHT)
     #object_test = rectangle(-100, -100, 50, 50)
     objects = list()
     
@@ -98,38 +88,48 @@ def main():
         rads = radians(rotation)
         
         if keys[pygame.K_w]:
-            velocity -= acceleration
+            velocity -= CAR_ACCELERATION
             pressed=True
             
         if keys[pygame.K_s]:
-            velocity += acceleration 
+            velocity += CAR_ACCELERATION 
             pressed=True
             
         # Turning left only
         if keys[pygame.K_a] and not keys[pygame.K_d]:
-            angular_velocity = clamp(angular_velocity+0.002, -0.4, 0.4)
+            angular_velocity = clamp(
+                angular_velocity+CAR_ANGULAR_ACCELERATION,
+                -CAR_MAX_ANGULAR_VELOCITY, CAR_MAX_ANGULAR_VELOCITY
+            )
 
         # Turning right only 
         elif keys[pygame.K_d] and not keys[pygame.K_a]:
-            angular_velocity = clamp(angular_velocity-0.002, -0.4, 0.4)
+            angular_velocity = clamp(
+                angular_velocity-CAR_ANGULAR_ACCELERATION,
+                -CAR_MAX_ANGULAR_VELOCITY, CAR_MAX_ANGULAR_VELOCITY
+            )
 
         # Else either both pressed or neither pressed. Move wheel towards center.
         else:
-            if angular_velocity < 0.001 and angular_velocity > -0.001: angular_velocity = 0.0
-            if angular_velocity != 0.0: angular_velocity *= 0.985
+            if angular_velocity < CAR_ANGULAR_ZERO_THRESHOLD and angular_velocity > -CAR_ANGULAR_ZERO_THRESHOLD:
+                angular_velocity = 0.0
+            if angular_velocity != 0.0:
+                angular_velocity *= CAR_ANGULAR_VELOCITY_DECAY
             
         # Only turn if car is in motion
         if velocity != 0:
             # Make turn speed dependent on velocity
             rotation -= angular_velocity * velocity
 
-        velocity = clamp(velocity, -MAX_VELOCITY_MAGNITUDE, MAX_VELOCITY_MAGNITUDE)
+        velocity = clamp(velocity, -CAR_MAX_VELOCITY, CAR_MAX_VELOCITY)
         move[0] += sin(rads) * velocity
         move[1] += cos(rads) * velocity
         
         if not pressed:
-            if velocity < 0.01 and velocity > -0.01: velocity = 0.0
-            if velocity != 0: velocity *= 0.99
+            if velocity < CAR_VELOCITY_ZERO_THRESHOLD and velocity > -CAR_VELOCITY_ZERO_THRESHOLD:
+                velocity = 0.0
+            if velocity != 0:
+                velocity *= CAR_VELOCITY_DECAY
                 
         pressed = False
         
@@ -137,18 +137,17 @@ def main():
         view_pos += move
         
         #screen reset
-        viewport.fill(black)
+        viewport.fill(RGB_BLACK)
         
         #render
-        radian_val = radians(rotation)
-        rotation_matrix = np.array([[cos(radian_val), -sin(radian_val)], [sin(radian_val), cos(radian_val)]])
+        rotation_matrix = np.array([[cos(rads), -sin(rads)], [sin(rads), cos(rads)]])
 
-        player_view_adjust = np.array(viewport_size)/2 + player_test.get_front_center() - view_pos
-        view_ajdust = np.array(viewport_size)/2 + player_test.get_center() - view_pos
+        player_view_adjust = half_viewport + player_test.get_front_center() - view_pos
+        view_ajdust = half_viewport + player_test.get_center() - view_pos
 
-        pygame.draw.polygon(viewport, blue, player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust))
+        pygame.draw.polygon(viewport, RBG_BLUE, player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust))
         for object in objects:
-            pygame.draw.polygon(viewport, green, object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust))
+            pygame.draw.polygon(viewport, RGB_GREEN, object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust))
         
         #swap buffers
         pygame.display.flip()
