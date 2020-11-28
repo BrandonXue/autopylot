@@ -18,8 +18,9 @@ def adjust_viewport_position(map_size, viewport_size, view_pos)->np.array:
     
     return view_pos
     
-def rotate_around_player2(player_pos, obj_pos):
-    pass
+def rotate_around_player2(player_pos, obj_pos, rotation_matrix: np.array):
+    temp_vec = obj_pos - player_pos
+    return rotation_matrix.dot(temp_vec)
 
 def rotate_around_player(player_pos, obj_pos, rotation)->np.array:
     temp_vec = obj_pos - player_pos
@@ -45,6 +46,12 @@ class rectangle:
         new_coords = np.array([rotate_around_player(point_of_rotation, [x, y], rotation) for [x,y] in self.coordinates_])
         new_coords = np.array([get_relative_coordinates([x, y], view_position, viewport_size) for [x,y] in new_coords])
         return new_coords.tolist()
+
+    def get_coords2(self, point_of_rotation, rotation_matrix, view_adjust):
+        new_coords = []
+        for point in self.coordinates_:
+            new_coords.append(rotation_matrix.dot(point - point_of_rotation) + view_adjust)
+        return new_coords
         
     def move(self, move_values:np.array(2) = np.array([0.,0.])):
         self.coordinates_ += move_values
@@ -93,16 +100,15 @@ def main():
     
     #viewport position needs to center on object
     view_pos = np.array([0., 0.])
+    player_rotation_matrix = np.array([[1.0, 0.0], [0.0, 1.0]]) # I2
 
     while True:
         #update events
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
-            
-            if event.type == pygame.KEYDOWN and event.key < KEY_ARRAY_SIZE:
+            elif event.type == pygame.KEYDOWN and event.key < KEY_ARRAY_SIZE:
                 keys[event.key] = True
-            
-            if event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
+            elif event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
                 keys[event.key] = False
             
         #game logic
@@ -155,9 +161,15 @@ def main():
         viewport.fill(black)
         
         #render
-        pygame.draw.polygon(viewport, blue, player_test.get_coords(player_test.get_front_center(), view_pos, viewport_size, 0))
+        radian_val = radians(rotation)
+        rotation_matrix = np.array([[cos(radian_val), -sin(radian_val)], [sin(radian_val), cos(radian_val)]])
+
+        player_view_adjust = np.array(viewport_size)/2 + player_test.get_front_center() - view_pos
+        view_ajdust = np.array(viewport_size)/2 + player_test.get_center() - view_pos
+
+        pygame.draw.polygon(viewport, blue, player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust))
         for object in objects:
-            pygame.draw.polygon(viewport, green, object.get_coords(player_test.get_center(), view_pos, viewport_size, rotation))
+            pygame.draw.polygon(viewport, green, object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust))
         
         #swap buffers
         pygame.display.flip()
