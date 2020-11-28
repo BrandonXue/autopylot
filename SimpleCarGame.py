@@ -1,4 +1,6 @@
 import sys, pygame
+import tensorflow as tf
+from tensorflow import keras
 import numpy as np
 from math import sqrt, radians, sin, cos, exp, fabs
 from random import randint
@@ -16,6 +18,9 @@ def adjust_viewport_position(map_size, viewport_size, view_pos)->np.array:
     
     return view_pos
     
+def rotate_around_player2(player_pos, obj_pos):
+    pass
+
 def rotate_around_player(player_pos, obj_pos, rotation)->np.array:
     temp_vec = obj_pos - player_pos
     radian_val = radians(rotation)
