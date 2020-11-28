@@ -1,25 +1,14 @@
 import sys, pygame
 import numpy as np
+import pygame.freetype
 from math import sqrt, radians, sin, cos
 from random import randint
 
 def get_relative_coordinates(abs_pos, view_pos, viewport_size)->np.array:
     return abs_pos - view_pos + np.array(viewport_size)/2
     
-def adjust_viewport_position(map_size, viewport_size, view_pos)->np.array:
-    #check x
-    if view_pos[0] < -map_size[0]/2 + viewport_size[0]/2: view_pos[0] = -map_size[0]/2 + viewport_size[0]/2
-    elif view_pos[0] > map_size[0]/2 + viewport_size[0]/2: view_pos[0] = map_size[0]/2 + viewport_size[0]/2
-    #check y
-    if view_pos[1] < -map_size[1]/2 + viewport_size[1]/2: view_pos[1] = -map_size[1]/2 + viewport_size[1]/2
-    elif view_pos[1] > map_size[1]/2 + viewport_size[1]/2: view_pos[1] = map_size[1]/2 + viewport_size[1]/2
-    
-    return view_pos
-    
-def rotate_around_player(player_pos, obj_pos, rotation)->np.array:
+def rotate_around_player(player_pos, obj_pos, rotation_matrix)->np.array:
     temp_vec = obj_pos - player_pos
-    radian_val = radians(rotation)
-    rotation_matrix = np.array([[cos(radian_val), -sin(radian_val)], [sin(radian_val), cos(radian_val)]])
     rotated_position = rotation_matrix.dot(temp_vec) + player_pos
     return rotated_position
     
@@ -36,10 +25,14 @@ class rectangle:
         self.center_ = np.array([x+width/2,y+height/2], dtype=float)
         self.front_center_ = np.array([x+width/2, y], dtype=float)
         
-    def get_coords(self, point_of_rotation, view_position, viewport_size, rotation):
-        new_coords = np.array([rotate_around_player(point_of_rotation, [x, y], rotation) for [x,y] in self.coordinates_])
+    def get_coords(self, point_of_rotation, view_position, viewport_size, rotation_matrix):
+        new_coords = self.get_rotated(point_of_rotation, rotation_matrix)
         new_coords = np.array([get_relative_coordinates([x, y], view_position, viewport_size) for [x,y] in new_coords])
         return new_coords.tolist()
+        
+    #for the main player
+    def get_rotated(self, point_of_rotation, rotation_matrix):
+        return np.array([rotate_around_player(point_of_rotation, [x, y], rotation_matrix) for [x,y] in self.coordinates_])
         
     def move(self, move_values:np.array(2) = np.array([0.,0.])):
         self.coordinates_ += move_values
@@ -51,13 +44,24 @@ class rectangle:
         
     def get_front_center(self):
         return self.front_center_
+       
+    #doesn't work properly
+    def check_collision(self, coordinates)->bool:
+        for [x,y] in coordinates:
+            if x >= self.coordinates_[0][0] and x <= self.coordinates_[2][0] and y >= self.coordinates_[0][1]  and y <= self.coordinates_[2][1]:
+                return True
+        return False
 
 def main():
     pygame.init()
+    collision_info = pygame.freetype.Font(None, 36)
     keys = np.array([False]*1024)
     viewport_size = width, height = 1080, 720
+    half_viewport_size = np.array(viewport_size)/2
     viewport = pygame.display.set_mode(viewport_size)
     screen_rect = viewport.get_rect()
+    
+    identity_mat = np.array([[1,0],[0,1]])
     
     map_size = width, height = 2000, 2000
     
@@ -66,11 +70,13 @@ def main():
     blue = 0, 0, 255
     green = 0, 255, 0
     red = 255, 0, 0
+    white = 255, 255, 255
     
     rotation = 0.0
     velocity = 0.0
     acceleration = 0.005
     pressed = False
+    collision = False
     
     #object position    x, y
     abs_pos = np.array([0, 0])
@@ -131,10 +137,21 @@ def main():
         #screen reset
         viewport.fill(black)
         
+        radian_val = radians(rotation)
+        rotation_matrix = np.array([[cos(radian_val), -sin(radian_val)], [sin(radian_val), cos(radian_val)]])
+        
+        collision_points = player_test.get_rotated(player_test.get_center(), rotation_matrix)
+        
         #render
-        pygame.draw.polygon(viewport, blue, player_test.get_coords(player_test.get_front_center(), view_pos, viewport_size, 0))
+        pygame.draw.polygon(viewport, blue, player_test.get_coords(player_test.get_front_center(), view_pos, viewport_size, identity_mat))
         for object in objects:
-            pygame.draw.polygon(viewport, green, object.get_coords(player_test.get_center(), view_pos, viewport_size, rotation))
+            pygame.draw.polygon(viewport, green, object.get_coords(player_test.get_center(), view_pos, viewport_size, rotation_matrix))
+            if not collision:
+                collision = object.check_collision(collision_points)
+        
+        #text details
+        collision_info.render_to(viewport, [10, 10], "Collision: " + ("True" if collision else "False"), red)
+        collision = False
         
         #swap buffers
         pygame.display.flip()
