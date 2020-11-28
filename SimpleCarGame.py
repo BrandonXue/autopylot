@@ -1,11 +1,62 @@
 from config import *
-from rgb_colors import *
+#from rgb_colors import *
 import sys, pygame
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 from math import sqrt, radians, sin, cos, exp, fabs
 from random import randint
+
+from Menus import *
+
+##########################HUD################################
+
+
+DARK_RED = 150, 0, 0, 200
+LIGHT_RED = 255, 105, 105, 200
+
+GREEN = 0, 255, 0
+
+DARK_BLUE = 0, 0, 150, 200
+LIGHT_BLUE = 105, 105, 255, 200
+BLUE = 0, 0, 255
+
+
+##TEST
+class Car_Details_Menu(Menu):
+    def __init__(self, dimensions, pos, color):
+        super().__init__(dimensions, pos, color)
+        
+        self.car_acceleration = CAR_ACCELERATION
+        
+        plus_button = Button((30, 30), self, (dimensions[0] - 70, 10))
+        plus_button.set_text("+")
+        plus_button.set_font_size(32)
+        plus_button.set_backcolor(LIGHT_RED)
+        plus_button.on_press(lambda:plus_button.set_backcolor(DARK_RED))
+        plus_button.on_release(lambda:plus_button.set_backcolor(LIGHT_RED))
+        plus_button.on_click(lambda:self.add_to_car_acceleration(0.0005))
+        
+        self.add_text_field("AccSet", TextField((5, 20), "Car Acceleration : {:.4f}".format(self.car_acceleration), 14))
+        
+        minus_button = Button((30, 30), self, (dimensions[0] - 35, 10))
+        minus_button.set_text("-")
+        minus_button.set_font_size(32)
+        minus_button.set_backcolor(LIGHT_BLUE)
+        minus_button.on_press(lambda:minus_button.set_backcolor(DARK_BLUE))
+        minus_button.on_release(lambda:minus_button.set_backcolor(LIGHT_BLUE))
+        minus_button.on_click(lambda:self.add_to_car_acceleration(-0.0005))
+        
+    def add_to_car_acceleration(self, delta):
+        self.car_acceleration = self.car_acceleration + delta
+        self.set_text_field("AccSet", "Car Acceleration : {:.4f}".format(self.car_acceleration))
+        
+    def get_car_acceleration(self):
+        return self.car_acceleration
+
+#############################################################
+
+
     
 def rotate_around_player2(player_pos, obj_pos, rotation_matrix: np.array):
     temp_vec = obj_pos - player_pos
@@ -55,6 +106,8 @@ def main():
     half_viewport = np.array(VIEWPORT_SIZE)/2
     screen_rect = viewport.get_rect()
     
+    temp_menu = Car_Details_Menu((300, 500), (5, 5), (150, 150, 150, 200))
+    
     rotation = 0.0
     angular_velocity = 0.0 # Can think of this as steering wheel position
     velocity = 0.0
@@ -78,6 +131,19 @@ def main():
         #update events
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
+            
+            #MENU FUNCTIONS
+            if event.type == pygame.MOUSEMOTION:
+                temp_menu.set_mouse_pos(pygame.mouse.get_pos())
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                temp_menu.set_state(PRESS)
+                
+            if event.type == pygame.MOUSEBUTTONUP:
+                temp_menu.set_state(RELEASE)
+                temp_menu.set_state(CLICK)
+            #END MENU FUNCTIONS
+            
+            #VEHICLE FUNCTIONS
             elif event.type == pygame.KEYDOWN and event.key < KEY_ARRAY_SIZE:
                 keys[event.key] = True
             elif event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
@@ -88,11 +154,11 @@ def main():
         rads = radians(rotation)
         
         if keys[pygame.K_w]:
-            velocity -= CAR_ACCELERATION
+            velocity -= temp_menu.get_car_acceleration()#CAR_ACCELERATION
             pressed=True
             
         if keys[pygame.K_s]:
-            velocity += CAR_ACCELERATION 
+            velocity += temp_menu.get_car_acceleration()#CAR_ACCELERATION 
             pressed=True
             
         # Turning left only
@@ -137,7 +203,7 @@ def main():
         view_pos += move
         
         #screen reset
-        viewport.fill(RGB_BLACK)
+        viewport.fill(BLACK)
         
         #render
         rotation_matrix = np.array([[cos(rads), -sin(rads)], [sin(rads), cos(rads)]])
@@ -145,9 +211,12 @@ def main():
         player_view_adjust = half_viewport + player_test.get_front_center() - view_pos
         view_ajdust = half_viewport + player_test.get_center() - view_pos
 
-        pygame.draw.polygon(viewport, RBG_BLUE, player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust))
+        pygame.draw.polygon(viewport, BLUE, player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust))
         for object in objects:
-            pygame.draw.polygon(viewport, RGB_GREEN, object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust))
+            pygame.draw.polygon(viewport, GREEN, object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust))
+        
+        #render menuds
+        temp_menu.draw(viewport)
         
         #swap buffers
         pygame.display.flip()
