@@ -4,19 +4,6 @@ from tensorflow import keras
 import numpy as np
 from math import sqrt, radians, sin, cos, exp, fabs
 from random import randint
-
-def get_relative_coordinates(abs_pos, view_pos, viewport_size)->np.array:
-    return abs_pos - view_pos + np.array(viewport_size)/2
-    
-def adjust_viewport_position(map_size, viewport_size, view_pos)->np.array:
-    #check x
-    if view_pos[0] < -map_size[0]/2 + viewport_size[0]/2: view_pos[0] = -map_size[0]/2 + viewport_size[0]/2
-    elif view_pos[0] > map_size[0]/2 + viewport_size[0]/2: view_pos[0] = map_size[0]/2 + viewport_size[0]/2
-    #check y
-    if view_pos[1] < -map_size[1]/2 + viewport_size[1]/2: view_pos[1] = -map_size[1]/2 + viewport_size[1]/2
-    elif view_pos[1] > map_size[1]/2 + viewport_size[1]/2: view_pos[1] = map_size[1]/2 + viewport_size[1]/2
-    
-    return view_pos
     
 def rotate_around_player2(player_pos, obj_pos, rotation_matrix: np.array):
     temp_vec = obj_pos - player_pos
@@ -41,11 +28,6 @@ class rectangle:
         self.coordinates_ = np.array([[x, y],[x+width, y], [x+width, y+height], [x, y+height]], dtype=float)
         self.center_ = np.array([x+width/2,y+height/2], dtype=float)
         self.front_center_ = np.array([x+width/2, y], dtype=float)
-        
-    def get_coords(self, point_of_rotation, view_position, viewport_size, rotation):
-        new_coords = np.array([rotate_around_player(point_of_rotation, [x, y], rotation) for [x,y] in self.coordinates_])
-        new_coords = np.array([get_relative_coordinates([x, y], view_position, viewport_size) for [x,y] in new_coords])
-        return new_coords.tolist()
 
     def get_coords2(self, point_of_rotation, rotation_matrix, view_adjust):
         new_coords = []
@@ -146,9 +128,6 @@ def main():
         move[1] += cos(rads) * velocity
         
         if not pressed:
-            # if velocity > 0.0: velocity -= acceleration
-            # elif velocity < 0.0: velocity += acceleration
-            # if velocity < 0.002 and velocity > -0.002: velocity = 0.0
             if velocity < 0.01 and velocity > -0.01: velocity = 0.0
             if velocity != 0: velocity *= 0.99
                 
