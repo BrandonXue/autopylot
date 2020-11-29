@@ -1,5 +1,6 @@
 # RGB colorvalues
 RGB_BLACK = (0, 0, 0)
+RGB_WHITE = (255, 255, 255)
 RGB_BLUE = (0, 0, 255)
 RGB_GRAY = (200, 200, 200)
 RGB_GREEN = (0, 255, 0)

@@ -9,6 +9,8 @@ from random import randint
 
 from Menus import *
 
+from skimage import color, exposure, transform
+
 
 ##TEST
 class Car_Details_Menu(Menu):
@@ -125,6 +127,9 @@ def main():
     viewport_diag = sqrt(half_viewport[0]**2 + half_viewport[1]**2)
     screen_rect = viewport.get_rect()
     
+    cover_viewport = pygame.Surface((80,80))
+    cover_viewport.fill(RGB_WHITE)
+    
     font = pygame.freetype.Font(None, 32)
     
     temp_menu = Car_Details_Menu((300, 500), (5, 5), (150, 150, 150, 200))
@@ -157,7 +162,7 @@ def main():
 
     max_collision_check_dist = (
         sqrt((CAR_WIDTH/2)**2 + (CAR_HEIGHT/2)**2) # player/car box hypoetenuse
-        + sqrt((MAX_BOX_WIDTH/2)**2 + (MAX_BOX_HEIGHT/2)**2) # terrain object max hypotenuse
+        + sqrt((MAX_BOX_WIDTH/2)**2 + (MAX_BOX_HEIGHT/2)**2)+50 # terrain object max hypotenuse
     )
     while True:
         #update events
@@ -181,6 +186,8 @@ def main():
             elif event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
                 keys[event.key] = False
             
+            
+        
         #game logic
         move = np.array([0., 0.])
         rads = radians(rotation)
@@ -192,6 +199,9 @@ def main():
         if keys[pygame.K_s]:
             velocity += temp_menu.get_car_acceleration()#CAR_ACCELERATION 
             pressed=True
+            
+       
+            
             
         # Turning left only
         if keys[pygame.K_a] and not keys[pygame.K_d]:
@@ -235,7 +245,7 @@ def main():
         view_pos += move
         
         #screen reset
-        viewport.fill(RGB_BLACK)
+        viewport.fill(RGB_WHITE)
         
         #render
         rotation_matrix = np.array([[cos(rads), -sin(rads)], [sin(rads), cos(rads)]])
@@ -249,6 +259,9 @@ def main():
 
         player_pos = player_test.get_center()
         player_max_dim = player_test.get_max_dim()
+        
+        collision = False
+        
         for obj in objects:
             obj_center = obj.get_center()
             max_viewable_dist = viewport_diag + obj.get_max_dim()
@@ -264,16 +277,30 @@ def main():
                 
                 pygame.draw.polygon(viewport, RGB_GREEN, object_coords)
             
+        if keys[pygame.K_p]:
+            cover_viewport.fill(RGB_WHITE)
+            pixels = pygame.surfarray.pixels3d(viewport)
+            
+            pixels = color.rgb2grey(pixels)
+            pixels = transform.resize(pixels,(80,80))
+            pixels = exposure.rescale_intensity(pixels, out_range=(0, 255))
+            
+            pygame.surfarray.blit_array(cover_viewport, pixels)
+            
+            viewport.blit(cover_viewport, (VIEWPORT_SIZE[0]-180,VIEWPORT_SIZE[1]-180))
+        #else:
+            #pygame.display.flip()
+            
+        #render menus
+        #temp_menu.draw(viewport)
         
-        
-        #render menuds
-        temp_menu.draw(viewport)
         col_text = "Collisions: " + ("True" if collision else "False")
-        font.render_to(viewport, (5, 100), col_text, RGBA_LIGHT_RED)
-        collision = False
-        
+        font.render_to(viewport, (5, 5), col_text, RGBA_LIGHT_RED)
+
         #swap buffers
         pygame.display.flip()
+        
+        
         
 if __name__ == '__main__':
     main()
