@@ -52,8 +52,6 @@ def rotate_around_player2(player_pos, obj_pos, rotation_matrix: np.array):
 
 def rotate_around_player(player_pos, obj_pos, rotation)->np.array:
     temp_vec = obj_pos - player_pos
-    radian_val = radians(rotation)
-    rotation_matrix = np.array([[cos(radian_val), -sin(radian_val)], [sin(radian_val), cos(radian_val)]])
     rotated_position = rotation_matrix.dot(temp_vec) + player_pos
     return rotated_position
     
@@ -103,6 +101,10 @@ class rectangle:
             new_coords.append(rotation_matrix.dot(point - point_of_rotation) + view_adjust)
         return new_coords
         
+    #for the main player
+    def get_rotated(self, point_of_rotation, rotation_matrix):
+        return np.array([rotate_around_player(point_of_rotation, [x, y], rotation_matrix) for [x,y] in self.coordinates_])
+        
     def move(self, move_values:np.array(2) = np.array([0.,0.])):
         self.coordinates_ += move_values
         self.center_ += move_values
@@ -113,6 +115,13 @@ class rectangle:
         
     def get_front_center(self):
         return self.front_center_
+       
+    #doesn't work properly
+    def check_collision(self, coordinates)->bool:
+        for [x,y] in coordinates:
+            if x >= self.coordinates_[0][0] and x <= self.coordinates_[2][0] and y >= self.coordinates_[0][1]  and y <= self.coordinates_[2][1]:
+                return True
+        return False
 
     def get_max_dim(self):
         return self.max_dim
@@ -133,6 +142,7 @@ def main():
     angular_velocity = 0.0 # Can think of this as steering wheel position
     velocity = 0.0
     pressed = False
+    collision = False
     
     collision = False
     
@@ -236,6 +246,11 @@ def main():
         
         #screen reset
         viewport.fill(RGB_BLACK)
+        
+        radian_val = radians(rotation)
+        rotation_matrix = np.array([[cos(radian_val), -sin(radian_val)], [sin(radian_val), cos(radian_val)]])
+        
+        collision_points = player_test.get_rotated(player_test.get_center(), rotation_matrix)
         
         #render
         rotation_matrix = np.array([[cos(rads), -sin(rads)], [sin(rads), cos(rads)]])
