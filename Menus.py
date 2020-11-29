@@ -1,3 +1,4 @@
+from rgb_colors import *
 import sys, pygame, pygame.freetype
 import numpy as np
 
@@ -9,13 +10,11 @@ RELEASE = 2
 CLICK = 3
 #end click states
 
-GRAY = 200, 200, 200
-BLACK = 0, 0, 0
-CLEAR = 0,0,0,0
+
 
 class Button:
     
-    def __init__(self, dimensions, context, pos = [0,0], forecolor=GRAY, backcolor=GRAY, text="", fontsize=12, fontcolor=BLACK, borderwidth=0):
+    def __init__(self, dimensions, context, pos = [0,0], forecolor=RGB_GRAY, backcolor=RGB_GRAY, text="", fontsize=12, fontcolor=RGB_BLACK, borderwidth=0):
         self.context_ = context
         self.image_ = pygame.Surface(list(dimensions), pygame.SRCALPHA)
         self.dimensions_ = dimensions
@@ -85,7 +84,7 @@ class Button:
             self.context_.get_image().blit(self.image_, self.pos_)
             
 class TextField:
-    def __init__(self, pos, text = "", fontsize = 32, fontcolor = BLACK):
+    def __init__(self, pos, text = "", fontsize = 32, fontcolor = RGB_BLACK):
         self.pos_ = pos
         self.text_ = text
         self.fontsize_ = fontsize

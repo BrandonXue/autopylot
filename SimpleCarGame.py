@@ -1,5 +1,5 @@
 from config import *
-#from rgb_colors import *
+from rgb_colors import *
 import sys, pygame
 import tensorflow as tf
 from tensorflow import keras
@@ -8,18 +8,6 @@ from math import sqrt, radians, sin, cos, exp, fabs
 from random import randint
 
 from Menus import *
-
-##########################HUD################################
-
-
-DARK_RED = 150, 0, 0, 200
-LIGHT_RED = 255, 105, 105, 200
-
-GREEN = 0, 255, 0
-
-DARK_BLUE = 0, 0, 150, 200
-LIGHT_BLUE = 105, 105, 255, 200
-BLUE = 0, 0, 255
 
 
 ##TEST
@@ -32,9 +20,9 @@ class Car_Details_Menu(Menu):
         plus_button = Button((30, 30), self, (dimensions[0] - 70, 10))
         plus_button.set_text("+")
         plus_button.set_font_size(32)
-        plus_button.set_backcolor(LIGHT_RED)
-        plus_button.on_press(lambda:plus_button.set_backcolor(DARK_RED))
-        plus_button.on_release(lambda:plus_button.set_backcolor(LIGHT_RED))
+        plus_button.set_backcolor(RGBA_LIGHT_RED)
+        plus_button.on_press(lambda:plus_button.set_backcolor(RGBA_DARK_RED))
+        plus_button.on_release(lambda:plus_button.set_backcolor(RGBA_LIGHT_RED))
         plus_button.on_click(lambda:self.add_to_car_acceleration(0.0005))
         
         self.add_text_field("AccSet", TextField((5, 20), "Car Acceleration : {:.4f}".format(self.car_acceleration), 14))
@@ -42,9 +30,9 @@ class Car_Details_Menu(Menu):
         minus_button = Button((30, 30), self, (dimensions[0] - 35, 10))
         minus_button.set_text("-")
         minus_button.set_font_size(32)
-        minus_button.set_backcolor(LIGHT_BLUE)
-        minus_button.on_press(lambda:minus_button.set_backcolor(DARK_BLUE))
-        minus_button.on_release(lambda:minus_button.set_backcolor(LIGHT_BLUE))
+        minus_button.set_backcolor(RGBA_LIGHT_BLUE)
+        minus_button.on_press(lambda:minus_button.set_backcolor(RGBA_DARK_BLUE))
+        minus_button.on_release(lambda:minus_button.set_backcolor(RGBA_LIGHT_BLUE))
         minus_button.on_click(lambda:self.add_to_car_acceleration(-0.0005))
         
     def add_to_car_acceleration(self, delta):
@@ -247,7 +235,7 @@ def main():
         view_pos += move
         
         #screen reset
-        viewport.fill(BLACK)
+        viewport.fill(RGB_BLACK)
         
         #render
         rotation_matrix = np.array([[cos(rads), -sin(rads)], [sin(rads), cos(rads)]])
@@ -257,7 +245,7 @@ def main():
         
         player_coords = player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust)
 
-        pygame.draw.polygon(viewport, BLUE, player_coords)
+        pygame.draw.polygon(viewport, RGB_BLUE, player_coords)
 
         player_pos = player_test.get_center()
         player_max_dim = player_test.get_max_dim()
@@ -274,14 +262,14 @@ def main():
                     and fabs(player_pos[1] - obj_center[1]) < max_collision_check_dist):
                     if check_collision(player_coords, object_coords): collision = True
                 
-                pygame.draw.polygon(viewport, GREEN, object_coords)
+                pygame.draw.polygon(viewport, RGB_GREEN, object_coords)
             
         
         
         #render menuds
         temp_menu.draw(viewport)
         col_text = "Collisions: " + ("True" if collision else "False")
-        font.render_to(viewport, (5, 100), col_text, LIGHT_RED)
+        font.render_to(viewport, (5, 100), col_text, RGBA_LIGHT_RED)
         collision = False
         
         #swap buffers
