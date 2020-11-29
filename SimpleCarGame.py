@@ -69,6 +69,36 @@ def rotate_around_player(player_pos, obj_pos, rotation)->np.array:
     rotated_position = rotation_matrix.dot(temp_vec) + player_pos
     return rotated_position
     
+def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in format x, y. p1 and p2 together form a line and p3 and p4 together form a line
+    v1 = (p2[0] - p1[0], p2[1] - p1[1])
+    v2 = (p4[0] - p3[0], p4[1] - p3[1])
+    odd1 = p3[0] - p1[0]
+    odd2 = p1[1] - p3[1]
+
+    numt = v2[1]*odd1 + v2[0]*odd2
+    nums = odd2*v1[0] + odd1*v1[1]
+    
+    den = v1[0]*v2[1] - v1[1]*c2[0]
+
+    #numt = (p4[1]-p3[1])*(p3[0]-p1[0]) + (p4[0]-p3[0])*(p1[1]-p3[1])
+    #nums = (p1[1]-p3[1])*(p2[0]-p1[0]) + (p3[0]-p1[0])*(p2[1]-p1[1])
+    #den = (p2[0]-p1[0])*(p4[1]-p3[1]) - (p2[1]-p1[1])*(p4[0]-p3[0])
+    
+    try:
+        t = numt / den
+        s = nums / den
+        if t >= 0 and t <= 1 and s >= 0 and s <= 1:
+            return True
+    except ArithmeticError:
+        return False
+    return False
+    
+def check_collision(ob_coords1, ob_coords2):
+    for i in range(0, 3):
+        for j in range(0, 3):
+            if lin_seg_intersection(ob_coords1[i-1], ob_coords1[i], ob_coords2[j-1], ob_coords2[j]): return True
+    return False
+    
 def clamp(value, min, max):
     if value > max:
         value = max
@@ -106,12 +136,16 @@ def main():
     half_viewport = np.array(VIEWPORT_SIZE)/2
     screen_rect = viewport.get_rect()
     
+    font = pygame.freetype.Font(None, 32)
+    
     temp_menu = Car_Details_Menu((300, 500), (5, 5), (150, 150, 150, 200))
     
     rotation = 0.0
     angular_velocity = 0.0 # Can think of this as steering wheel position
     velocity = 0.0
     pressed = False
+    
+    collision = False
     
     #object position    x, y
     abs_pos = np.array([0, 0])
@@ -210,13 +244,25 @@ def main():
 
         player_view_adjust = half_viewport + player_test.get_front_center() - view_pos
         view_ajdust = half_viewport + player_test.get_center() - view_pos
+        
+        player_coords = player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust)
 
-        pygame.draw.polygon(viewport, BLUE, player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust))
+        pygame.draw.polygon(viewport, BLUE, player_coords)
         for object in objects:
-            pygame.draw.polygon(viewport, GREEN, object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust))
+            object_coords = object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust)
+            
+            if not collision:
+                if check_collision(player_coords, object_coords): collision = True
+            
+            pygame.draw.polygon(viewport, GREEN, object_coords)
+            
+        
         
         #render menuds
         temp_menu.draw(viewport)
+        col_text = "Collisions: " + ("True" if collision else "False")
+        font.render_to(viewport, (5, 100), col_text, LIGHT_RED)
+        collision = False
         
         #swap buffers
         pygame.display.flip()
