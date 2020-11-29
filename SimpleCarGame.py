@@ -78,7 +78,7 @@ def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in 
     numt = v2[1]*odd1 + v2[0]*odd2
     nums = odd2*v1[0] + odd1*v1[1]
     
-    den = v1[0]*v2[1] - v1[1]*c2[0]
+    den = v1[0]*v2[1] - v1[1]*v2[0]
 
     #numt = (p4[1]-p3[1])*(p3[0]-p1[0]) + (p4[0]-p3[0])*(p1[1]-p3[1])
     #nums = (p1[1]-p3[1])*(p2[0]-p1[0]) + (p3[0]-p1[0])*(p2[1]-p1[1])
