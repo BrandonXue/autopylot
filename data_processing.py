@@ -18,4 +18,5 @@ class DataProcessor:
                 if received == self.exit_keyword:
                     break
 
+                # TODO: Train neural net here
                 print(received)

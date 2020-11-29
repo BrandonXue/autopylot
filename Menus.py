@@ -1,6 +1,5 @@
 from rgb_colors import *
-import sys, pygame, pygame.freetype
-import numpy as np
+import pygame, pygame.freetype
 
 #click states
 NONE = 0

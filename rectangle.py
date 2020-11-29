@@ -1,5 +1,3 @@
-import numpy as np
-from numpy.lib.function_base import vectorize
 import pygame
 
 class Rectangle:
@@ -25,14 +23,13 @@ class Rectangle:
             (self.corners[3] - pivot_point).rotate(degrees) + view_adjust
         )
   
-    def move(self, move_values:np.array(2) = np.array([0.,0.])):
-        self.corners[0] += pygame.math.Vector2(move_values[0], move_values[1])
-        self.corners[1] += pygame.math.Vector2(move_values[0], move_values[1])
-        self.corners[2] += pygame.math.Vector2(move_values[0], move_values[1])
-        self.corners[3] += pygame.math.Vector2(move_values[0], move_values[1])
-        self.center_vec += pygame.math.Vector2(move_values[0], move_values[1])
+    def move(self, move_vec: pygame.math.Vector2 = pygame.math.Vector2(0.0, 0.0)):
+        self.corners[0] += move_vec
+        self.corners[1] += move_vec
+        self.corners[2] += move_vec
+        self.corners[3] += move_vec
+        self.center_vec += move_vec
 
-        
     def get_center(self):
         return self.center_vec
 
@@ -46,10 +43,6 @@ class PlayerRectangle(Rectangle):
         # Set position and state
         # We want a position near the rear because cars pivot around rear axle
         self.rear_center_vec = pygame.math.Vector2(x + width/2, y + height * 0.8)
-        self.radians = 0.0
-        self.angular_vel = 0.0
-        self.vel = 0.0
-        self.collision = False
 
     def is_colliding(self):
         return self.collision
@@ -57,18 +50,22 @@ class PlayerRectangle(Rectangle):
     def get_rear_center(self):
         return self.rear_center_vec
 
-    def move(self, move_values:np.array(2) = np.array([0.,0.])):
-        super().move(move_values)
-        self.rear_center_vec += move_values
+    def move(self, move_vec:pygame.math.Vector2 = pygame.math.Vector2(0.0, 0.0)):
+        super().move(move_vec)
+        self.rear_center_vec += move_vec
 
 def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in format x, y. p1 and p2 together form a line and p3 and p4 together form a line
-    v1 = (p2[0] - p1[0], p2[1] - p1[1])
-    v2 = (p4[0] - p3[0], p4[1] - p3[1])
-    odd1 = p3[0] - p1[0]
-    odd2 = p1[1] - p3[1]
+    v1 = p2 - p1
+    v2 = p4 - p3
 
-    numt = v2[1]*odd1 + v2[0]*odd2
-    nums = odd2*v1[0] + odd1*v1[1]
+    # odd1 = p3[0] - p1[0]
+    # odd2 = p1[1] - p3[1]
+    # numt = odd2*v2[0] + odd1*v2[1]
+    # nums = odd2*v1[0] + odd1*v1[1]
+
+    odd = pygame.math.Vector2(p1[1] - p3[1], p3[0] - p1[0])
+    numt = odd.dot(v2)
+    nums = odd.dot(v1)
 
     den = v1[0]*v2[1] - v1[1]*v2[0]
     
@@ -83,7 +80,7 @@ def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in 
     return False
     
 def check_collision(ob_coords1, ob_coords2):
-    for i in range(0, 4):
-        for j in range(0, 4):
+    for i in range(4):
+        for j in range(4):
             if lin_seg_intersection(ob_coords1[i-1], ob_coords1[i], ob_coords2[j-1], ob_coords2[j]): return True
     return False

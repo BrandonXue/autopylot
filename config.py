@@ -5,12 +5,12 @@ print('\nConfig loaded for', CURRENT_USER, end='\n\n') # Remind on load
 
 # =================== VIEWPORT ===================
 VIEWPORT_WIDTH = {
-    'Brandon Xue': 540,
+    'Brandon Xue': 1080,
     'Jacob Rapmund': 1080
 }[CURRENT_USER]
 
 VIEWPORT_HEIGHT = {
-    'Brandon Xue': 360,
+    'Brandon Xue': 720,
     'Jacob Rapmund': 720
 }[CURRENT_USER]
 
