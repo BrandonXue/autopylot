@@ -1,15 +1,15 @@
 from config import *
+from Menus import *
 from rgb_colors import *
+
+import numpy as np
 import sys, pygame
 import tensorflow as tf
-from tensorflow import keras
-import numpy as np
+
 from math import sqrt, radians, sin, cos, exp, fabs
 from random import randint
-from skimage import color, io, transform, exposure
-import matplotlib.pyplot as plt
-
-from Menus import *
+from skimage import color, transform, exposure
+from tensorflow import keras
 
 
 ##TEST
@@ -122,10 +122,19 @@ class rectangle:
 def main():
     pygame.init()
     keys = np.array([False]*KEY_ARRAY_SIZE)
-    viewport = pygame.display.set_mode(VIEWPORT_SIZE)
+    viewport = pygame.display.set_mode(
+        VIEWPORT_SIZE, 
+        pygame.DOUBLEBUF | pygame.HWSURFACE,
+        depth=0 # let pygame choose depth
+    )
+    viewport.set_alpha(None)
+
     half_viewport = np.array(VIEWPORT_SIZE)/2
     viewport_diag = sqrt(half_viewport[0]**2 + half_viewport[1]**2)
     screen_rect = viewport.get_rect()
+    
+    cover_viewport = pygame.Surface((80,80))
+    cover_viewport.fill(RGB_WHITE)
     
     font = pygame.freetype.Font(None, 32)
     
@@ -197,6 +206,9 @@ def main():
             velocity += temp_menu.get_car_acceleration()#CAR_ACCELERATION 
             pressed=True
             
+       
+            
+            
         # Turning left only
         if keys[pygame.K_a] and not keys[pygame.K_d]:
             angular_velocity = clamp(
@@ -239,7 +251,7 @@ def main():
         view_pos += move
         
         #screen reset
-        viewport.fill(RGB_BLACK)
+        viewport.fill(RGB_WHITE)
         
         #render
         rotation_matrix = np.array([[cos(rads), -sin(rads)], [sin(rads), cos(rads)]])
@@ -255,6 +267,7 @@ def main():
         player_max_dim = player_test.get_max_dim()
 
         collision = False
+        
         for obj in objects:
             obj_center = obj.get_center()
             max_viewable_dist = viewport_diag + obj.get_max_dim()
@@ -269,22 +282,19 @@ def main():
                     if check_collision(player_coords, object_coords): collision = True
                 
                 pygame.draw.polygon(viewport, RGB_GREEN, object_coords)
-            
         
         # ============== After scene is drawn, but before overhead display ===============
-        # Debug print on p
         if keys[pygame.K_p]:
-            surf_arr = pygame.surfarray.pixels3d(pygame.display.get_surface())
-            grayscale_arr = color.rgb2gray(surf_arr)
-            grayscale_arr = transform.resize(grayscale_arr,(80,80))
-            grayscale_arr = exposure.rescale_intensity(grayscale_arr, out_range=(0, 255))
-
-            grayscale_surf = pygame.surfarray.make_surface(grayscale_arr)
-
-            fig, ax = plt.subplots(1, 1)
-            ax.imshow(grayscale_arr)
-            ax.set_title("Grayscale")
-            plt.show()
+            cover_viewport.fill(RGB_WHITE)
+            pixels = pygame.surfarray.pixels3d(viewport)
+            
+            pixels = color.rgb2gray(pixels)
+            pixels = transform.resize(pixels,(80,80))
+            pixels = exposure.rescale_intensity(pixels, out_range=(0, 255))
+            
+            pygame.surfarray.blit_array(cover_viewport, pixels)
+            
+            viewport.blit(cover_viewport, (VIEWPORT_SIZE[0]-180,VIEWPORT_SIZE[1]-180))
         
         # ============= After input buffer is used for neural net draw HUD ===============
         # temp_menu.draw(viewport)
@@ -294,6 +304,8 @@ def main():
         # ========================= Swap the buffer to display ===========================
         #swap buffers
         pygame.display.flip()
+        
+        
         
 if __name__ == '__main__':
     main()
