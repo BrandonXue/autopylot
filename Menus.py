@@ -2,18 +2,13 @@ from rgb_colors import *
 import sys, pygame, pygame.freetype
 import numpy as np
 
-
 #click states
 NONE = 0
 PRESS = 1
 RELEASE = 2
 CLICK = 3
-#end click states
-
-
 
 class Button:
-    
     def __init__(self, dimensions, context, pos = [0,0], forecolor=RGB_GRAY, backcolor=RGB_GRAY, text="", fontsize=12, fontcolor=RGB_BLACK, borderwidth=0):
         self.context_ = context
         self.image_ = pygame.Surface(list(dimensions), pygame.SRCALPHA)
