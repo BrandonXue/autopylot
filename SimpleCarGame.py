@@ -6,6 +6,8 @@ from tensorflow import keras
 import numpy as np
 from math import sqrt, radians, sin, cos, exp, fabs
 from random import randint
+from skimage import color, io, transform, exposure
+import matplotlib.pyplot as plt
 
 from Menus import *
 
@@ -155,9 +157,11 @@ def main():
     view_pos = np.array([0., 0.])
     player_rotation_matrix = np.array([[1.0, 0.0], [0.0, 1.0]]) # I2
 
+    # Only used for broad phase collision detection
     max_collision_check_dist = (
         sqrt((CAR_WIDTH/2)**2 + (CAR_HEIGHT/2)**2) # player/car box hypoetenuse
         + sqrt((MAX_BOX_WIDTH/2)**2 + (MAX_BOX_HEIGHT/2)**2) # terrain object max hypotenuse
+        + 50 # Arbitrary number to ensure we don't filter out anything that looks like it should be colliding
     )
     while True:
         #update events
@@ -180,8 +184,8 @@ def main():
                 keys[event.key] = True
             elif event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
                 keys[event.key] = False
-            
-        #game logic
+
+        # Game logic
         move = np.array([0., 0.])
         rads = radians(rotation)
         
@@ -249,6 +253,8 @@ def main():
 
         player_pos = player_test.get_center()
         player_max_dim = player_test.get_max_dim()
+
+        collision = False
         for obj in objects:
             obj_center = obj.get_center()
             max_viewable_dist = viewport_diag + obj.get_max_dim()
@@ -265,13 +271,27 @@ def main():
                 pygame.draw.polygon(viewport, RGB_GREEN, object_coords)
             
         
+        # ============== After scene is drawn, but before overhead display ===============
+        # Debug print on p
+        if keys[pygame.K_p]:
+            surf_arr = pygame.surfarray.pixels3d(pygame.display.get_surface())
+            grayscale_arr = color.rgb2gray(surf_arr)
+            grayscale_arr = transform.resize(grayscale_arr,(80,80))
+            grayscale_arr = exposure.rescale_intensity(grayscale_arr, out_range=(0, 255))
+
+            grayscale_surf = pygame.surfarray.make_surface(grayscale_arr)
+
+            fig, ax = plt.subplots(1, 1)
+            ax.imshow(grayscale_arr)
+            ax.set_title("Grayscale")
+            plt.show()
         
-        #render menuds
-        temp_menu.draw(viewport)
+        # ============= After input buffer is used for neural net draw HUD ===============
+        # temp_menu.draw(viewport)
         col_text = "Collisions: " + ("True" if collision else "False")
-        font.render_to(viewport, (5, 100), col_text, RGBA_LIGHT_RED)
-        collision = False
-        
+        font.render_to(viewport, (5, 5), col_text, RGBA_LIGHT_RED)
+
+        # ========================= Swap the buffer to display ===========================
         #swap buffers
         pygame.display.flip()
         
