@@ -27,6 +27,36 @@ MAP_HEIGHT = {
     'Jacob Rapmund': 2000
 }[CURRENT_USER]
 
+MAX_BOX_WIDTH = {
+    'Brandon Xue': 175,
+    'Jacob Rapmund': 175
+}[CURRENT_USER]
+
+MAX_BOX_HEIGHT = {
+    'Brandon Xue': 175,
+    'Jacob Rapmund': 175
+}[CURRENT_USER]
+
+MIN_BOX_WIDTH = {
+    'Brandon Xue': 100,
+    'Jacob Rapmund': 100
+}[CURRENT_USER]
+
+MIN_BOX_HEIGHT = {
+    'Brandon Xue': 100,
+    'Jacob Rapmund': 100
+}[CURRENT_USER]
+
+MAX_X_LOC_BOX = {
+    'Brandon Xue': 1500,
+    'Jacob Rapmund': 1500
+}[CURRENT_USER]
+
+MAX_Y_LOC_BOX = {
+    'Brandon Xue': 1500,
+    'Jacob Rapmund': 1500
+}[CURRENT_USER]
+
 MAP_SIZE = (MAP_WIDTH, MAP_HEIGHT)
 
 # ====================== CAR =====================

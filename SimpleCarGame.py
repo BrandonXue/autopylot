@@ -79,10 +79,6 @@ def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in 
     nums = odd2*v1[0] + odd1*v1[1]
     
     den = v1[0]*v2[1] - v1[1]*v2[0]
-
-    #numt = (p4[1]-p3[1])*(p3[0]-p1[0]) + (p4[0]-p3[0])*(p1[1]-p3[1])
-    #nums = (p1[1]-p3[1])*(p2[0]-p1[0]) + (p3[0]-p1[0])*(p2[1]-p1[1])
-    #den = (p2[0]-p1[0])*(p4[1]-p3[1]) - (p2[1]-p1[1])*(p4[0]-p3[0])
     
     try:
         t = numt / den
@@ -94,8 +90,8 @@ def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in 
     return False
     
 def check_collision(ob_coords1, ob_coords2):
-    for i in range(0, 3):
-        for j in range(0, 3):
+    for i in range(0, 4):
+        for j in range(0, 4):
             if lin_seg_intersection(ob_coords1[i-1], ob_coords1[i], ob_coords2[j-1], ob_coords2[j]): return True
     return False
     
@@ -111,6 +107,7 @@ class rectangle:
         self.coordinates_ = np.array([[x, y],[x+width, y], [x+width, y+height], [x, y+height]], dtype=float)
         self.center_ = np.array([x+width/2,y+height/2], dtype=float)
         self.front_center_ = np.array([x+width/2, y], dtype=float)
+        self.max_dim = width if width > height else height
 
     def get_coords2(self, point_of_rotation, rotation_matrix, view_adjust):
         new_coords = []
@@ -129,11 +126,15 @@ class rectangle:
     def get_front_center(self):
         return self.front_center_
 
+    def get_max_dim(self):
+        return self.max_dim
+
 def main():
     pygame.init()
     keys = np.array([False]*KEY_ARRAY_SIZE)
     viewport = pygame.display.set_mode(VIEWPORT_SIZE)
     half_viewport = np.array(VIEWPORT_SIZE)/2
+    viewport_diag = sqrt(half_viewport[0]**2 + half_viewport[1]**2)
     screen_rect = viewport.get_rect()
     
     font = pygame.freetype.Font(None, 32)
@@ -154,13 +155,22 @@ def main():
     #object_test = rectangle(-100, -100, 50, 50)
     objects = list()
     
-    for i in range(0, 10):
-        objects.append(rectangle(randint(-750,750), randint(-750, 750), randint(25, 75), randint(25, 75)))
+    for i in range(0, 50):
+        objects.append(
+            rectangle(
+                randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), # Location coords
+                randint(MIN_BOX_WIDTH, MAX_BOX_WIDTH), randint(MIN_BOX_HEIGHT, MAX_BOX_HEIGHT) # width height
+            )
+        )
     
     #viewport position needs to center on object
     view_pos = np.array([0., 0.])
     player_rotation_matrix = np.array([[1.0, 0.0], [0.0, 1.0]]) # I2
 
+    max_collision_check_dist = (
+        sqrt((CAR_WIDTH/2)**2 + (CAR_HEIGHT/2)**2) # player/car box hypoetenuse
+        + sqrt((MAX_BOX_WIDTH/2)**2 + (MAX_BOX_HEIGHT/2)**2) # terrain object max hypotenuse
+    )
     while True:
         #update events
         for event in pygame.event.get():
@@ -248,13 +258,23 @@ def main():
         player_coords = player_test.get_coords2(player_test.get_front_center(), player_rotation_matrix, player_view_adjust)
 
         pygame.draw.polygon(viewport, BLUE, player_coords)
-        for object in objects:
-            object_coords = object.get_coords2(player_test.get_center(), rotation_matrix, view_ajdust)
-            
-            if not collision:
-                if check_collision(player_coords, object_coords): collision = True
-            
-            pygame.draw.polygon(viewport, GREEN, object_coords)
+
+        player_pos = player_test.get_center()
+        player_max_dim = player_test.get_max_dim()
+        for obj in objects:
+            obj_center = obj.get_center()
+            max_viewable_dist = viewport_diag + obj.get_max_dim()
+            if (fabs(player_pos[0] - obj_center[0]) < max_viewable_dist
+                and fabs(player_pos[1] - obj_center[1]) < max_viewable_dist):
+
+                object_coords = obj.get_coords2(player_pos, rotation_matrix, view_ajdust)
+                
+                if (not collision 
+                    and fabs(player_pos[0] - obj_center[0]) < max_collision_check_dist
+                    and fabs(player_pos[1] - obj_center[1]) < max_collision_check_dist):
+                    if check_collision(player_coords, object_coords): collision = True
+                
+                pygame.draw.polygon(viewport, GREEN, object_coords)
             
         
         
