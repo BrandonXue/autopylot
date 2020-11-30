@@ -63,6 +63,19 @@ class CarGame:
         # Frame counter for throttling certain events
         # self.frame_count = 0
         
+    def reset_map(self):
+        self.rects = self.rects[:(self.points - NUMBER_OF_DOTS)]
+        self.points = 0
+        self.rotation = 0.0
+        self.angular_velocity = 0.0 # Can think of this as steering wheel position
+        self.velocity = 0.0
+        self.player_rect = PlayerRectangle(
+            self.player_start_pos[0]*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, 
+            self.player_start_pos[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
+            CAR_WIDTH, CAR_HEIGHT
+        )
+        self.add_goat_rects_from_pool()
+        
     def draw_keras_view(self, pixels):
         self.cover_display.fill(RGB_WHITE)
         pygame.surfarray.blit_array(self.cover_display, pixels) 
@@ -155,7 +168,7 @@ class CarGame:
     ##END USE ONLY FOR RANDOM MAPS
     
     #function for updating goal (will be a rectangle)
-    def udpate_goal_rect(self):
+    def update_goal_rect(self):
         self.rects.pop() #goal rect should always be last when using only one goal rect
         self.rects.append(
             EnvironmentRectangle(
@@ -165,9 +178,10 @@ class CarGame:
         )
 
     def add_goat_rects_from_pool(self): #needs set alive function
+        temp_pool = self.reward_dot_pool.copy()
         for i in range(0, NUMBER_OF_DOTS):
-            location = self.reward_dot_pool[randint(0, len(self.reward_dot_pool))]
-            self.reward_dot_pool.remove(location)
+            location = temp_pool[randint(0, len(temp_pool)-1)]
+            temp_pool.remove(location)
             self.rects.append(
                 EnvironmentRectangle(
                     location[0]*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, location[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
@@ -298,9 +312,13 @@ class CarGame:
                         if check_collision(player_coords, object_coords):
                             self.collision = True
                             if obj.get_type() == GOAL:
+                                #big reward
                                 self.points += 1
                                 obj.set_is_alive(False)
-                                #self.udpate_goal_rect()
+                                #self.update_goal_rect()
+                            else:
+                                #big penalty
+                                self.reset_map()
                     
                     obj.draw(self.display, object_coords)
 
