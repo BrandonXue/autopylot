@@ -120,10 +120,10 @@ KEY_ARRAY_SIZE = {
 
 FRAME_RATE = {
     'Brandon Xue': 60,
-    'Jacob Rapmund': 60
+    'Jacob Rapmund': 120
 }[CURRENT_USER]
 
 GRAYSCALE_DIM = {
     'Brandon Xue': 50,
-    'Jacob Rapmund': 50
+    'Jacob Rapmund': 80
 }[CURRENT_USER]

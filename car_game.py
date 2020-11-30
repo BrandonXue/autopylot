@@ -33,7 +33,7 @@ class CarGame:
         # Display related
         self.display = pygame.display.set_mode(
             VIEWPORT_SIZE,
-            pygame.DOUBLEBUF | pygame.HWSURFACE #| pygame.FULLSCREEN
+            pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.FULLSCREEN
         )
         self.display.set_alpha(None)
 
@@ -265,17 +265,11 @@ class CarGame:
                 obj.draw(self.display, object_coords)
         
         # ============== After scene is drawn, but before overhead display ===============
-        #self.frame_count = (self.frame_count + 1) % 30
-        self.frame_count = (self.frame_count + 1) % (FRAME_RATE//6)
-        #if self.dp_toggled and self.frame_count == 0:
-        if self.key_list[pygame.K_p] and self.frame_count == 0:
-            pixels = pygame.surfarray.pixels3d(self.display)
-            self.pipe_conn.send(pixels)
-            #pixels = color.rgb2gray(pixels)
-            #pixels = transform.resize(pixels,(GRAYSCALE_DIM,GRAYSCALE_DIM))
-            #pixels = exposure.rescale_intensity(pixels, out_range=(0, 255))
-            #
-            #pygame.surfarray.blit_array(self.cover_display, pixels)
+        self.frame_count = (self.frame_count + 1) % (FRAME_RATE//60)
+        #if self.key_list[pygame.K_p] and self.frame_count == 0:
+        #    pixels = pygame.surfarray.pixels3d(self.display)
+        #    self.pipe_conn.send(pixels)
+            
         if not self.cover_display.get_locked() and not self.display.get_locked():    
             self.display.blit(self.cover_display, (VIEWPORT_SIZE[0]-180,VIEWPORT_SIZE[1]-180))
         
@@ -313,7 +307,6 @@ class CarGame:
                 break
                 
             if self.pipe_conn.poll():
-                print("grabbing event.")
                 reply = self.pipe_conn.recv()
                 self.update_keras_view(reply)
 
