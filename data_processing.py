@@ -46,3 +46,5 @@ class DataProcessor:
             #pixels = np.transpose(pixels.astype('float64'), (1,0,2))
             pixels = np.transpose(pixels, (1,0))
             
+            #comment out if you dont want data sent
+            self.write_conn.send(pixels)
