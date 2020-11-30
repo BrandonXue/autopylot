@@ -1,4 +1,4 @@
-from rgb_colors import *
+from defs import *
 import pygame, pygame.freetype
 
 #click states

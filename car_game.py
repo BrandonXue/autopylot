@@ -1,5 +1,5 @@
 from config import *
-from rgb_colors import *
+from defs import *
 from car_details_menu import *
 from rectangle import *
 
@@ -17,13 +17,13 @@ def clamp(value, min, max):
     return value
 
 class CarGame:
-    def __init__(self, pipe_conn, exit_keyword):
+    def __init__(self, pipe_conn, exit_signal):
         # We may want to init() selective modules (to look into if we have time)
         pygame.init()
 
         # Set inter-process communication properties
         self.pipe_conn = pipe_conn
-        self.exit_keyword = exit_keyword
+        self.exit_signal = exit_signal
         self.world_bounds = Rectangle(-MAX_X_LOC_BOX, -MAX_Y_LOC_BOX, MAP_WIDTH, MAP_HEIGHT, RGB_WHITE)
         self.points = 0
 
@@ -303,7 +303,7 @@ class CarGame:
 
             # If escape is pressed, break main event loop
             if self.key_list[pygame.K_ESCAPE]:
-                self.pipe_conn.send(self.exit_keyword)
+                self.pipe_conn.send(self.exit_signal)
                 break
                 
             if self.pipe_conn.poll():
