@@ -24,6 +24,8 @@ class CarGame:
         # Set inter-process communication properties
         self.pipe_conn = pipe_conn
         self.exit_keyword = exit_keyword
+        self.world_bounds = Rectangle(-MAX_X_LOC_BOX, -MAX_Y_LOC_BOX, MAP_WIDTH, MAP_HEIGHT, RGB_WHITE)
+        self.points = 0
 
         # Keyboard related
         self.key_list = [False] * KEY_ARRAY_SIZE # Lists are faster for simple random access
@@ -34,9 +36,8 @@ class CarGame:
             pygame.DOUBLEBUF | pygame.HWSURFACE
         )
         self.display.set_alpha(None)
-       
 
-        self.cover_display = pygame.Surface((80, 80))
+        self.cover_display = pygame.Surface((GRAYSCALE_DIM, GRAYSCALE_DIM))
 
         self.font = pygame.freetype.Font(None, 32)
         self.car_details_menu = CarDetailsMenu((300, 500), (5, 5), (150, 150, 150, 200))
@@ -63,21 +64,74 @@ class CarGame:
 
         # Frame counter for throttling certain events
         self.frame_count = 0
-
+        
+    def update_keras_view(self, pixels):
+        self.cover_display.fill(RGB_WHITE)
+        pygame.surfarray.blit_array(self.cover_display, pixels)
+        
+    def create_bounds(self):
+        self.bounds = []
+        self.bounds.append(
+            EnvironmentRectangle(
+                -2000, -2000, # Location coords
+                100, 100, RGB_BLACK # width height
+            )
+        )
+        for i in range(1, 40):
+            self.bounds.append(
+                EnvironmentRectangle(
+                    i*100-2000, -2000, # Location coords
+                    100, 100, RGB_BLACK # width height
+                )
+            )
+            self.bounds.append(
+                EnvironmentRectangle(
+                    39*100-2000, i*100-2000, # Location coords
+                    100, 100, RGB_BLACK # width height
+                )
+            )
+            self.bounds.append(
+                EnvironmentRectangle(
+                    i*100-2000, 39*100-2000, # Location coords
+                    100, 100, RGB_BLACK # width height
+                )
+            )
+            self.bounds.append(
+                EnvironmentRectangle(
+                    -2000, i*100-2000, # Location coords
+                    100, 100, RGB_BLACK # width height
+                )
+            )
+        
 
     def create_player_rect(self):
         self.player_rect = PlayerRectangle(0, 0, CAR_WIDTH, CAR_HEIGHT)
-
-
+        
     def create_random_rects(self):
         self.rects = []
         for i in range(0, 50):
             self.rects.append(
-                Rectangle(
+                EnvironmentRectangle(
                     randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), # Location coords
                     randint(MIN_BOX_WIDTH, MAX_BOX_WIDTH), randint(MIN_BOX_HEIGHT, MAX_BOX_HEIGHT) # width height
                 )
             )
+        self.rects.append(
+            EnvironmentRectangle(
+                randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), 
+                25, 25, RGB_GOLD, GOAL
+            )
+        )
+        
+    #function for updating goal (will be a rectangle)
+    def udpate_goal_rect(self):
+        self.rects.pop() #goal rect should always be last
+        self.rects.append(
+            EnvironmentRectangle(
+                randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), 
+                25, 25, RGB_GOLD, GOAL
+            )
+        )
 
     def store_input_keys(self):
         for event in pygame.event.get():
@@ -164,12 +218,32 @@ class CarGame:
         # These locations are used as references
         player_center = self.player_rect.get_center()
         rear_axle = self.player_rect.get_rear_center()
+        
+        #Draw world boundaries and get coords
+        world_coords = self.world_bounds.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
 
         # Render the player
         player_coords = self.player_rect.pivot_and_offset(rear_axle, 0, self.display_offset)
-        pygame.draw.polygon(self.display, RGB_BLUE, player_coords)
+        
+        self.player_rect.draw(self.display, player_coords)
 
         collision = False
+        
+        for obj in self.bounds:
+
+            obj_center = obj.get_center()
+            max_viewable_dist = self.display_diag + obj.get_max_dim()
+
+            dist_between = player_center.distance_to(obj_center)
+            if (dist_between < max_viewable_dist):
+
+                object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
+                
+                if (not collision and dist_between < self.collision_check_dist):
+                    if check_collision(player_coords, object_coords):
+                        collision = True
+                
+                obj.draw(self.display, object_coords)
         
         for obj in self.rects:
 
@@ -184,44 +258,65 @@ class CarGame:
                 if (not collision and dist_between < self.collision_check_dist):
                     if check_collision(player_coords, object_coords):
                         collision = True
+                        if obj.get_type() == GOAL:
+                            self.points += 1
+                            self.udpate_goal_rect()
                 
-                pygame.draw.polygon(self.display, RGB_GREEN, object_coords)
+                obj.draw(self.display, object_coords)
         
         # ============== After scene is drawn, but before overhead display ===============
-        self.frame_count = (self.frame_count + 1) % 30
+        #self.frame_count = (self.frame_count + 1) % 30
+        self.frame_count = (self.frame_count + 1) % (FRAME_RATE//6)
+        #if self.dp_toggled and self.frame_count == 0:
         if self.key_list[pygame.K_p] and self.frame_count == 0:
-            # self.cover_display.fill(RGB_WHITE)
             pixels = pygame.surfarray.pixels3d(self.display)
-
             self.pipe_conn.send(pixels)
-            
-            # pixels = color.rgb2gray(pixels)
-            # pixels = transform.resize(pixels,(80,80))
-            # pixels = exposure.rescale_intensity(pixels, out_range=(0, 255))
-            
-            # pygame.surfarray.blit_array(self.cover_display, pixels)
-            
-            # self.display.blit(self.cover_display, (VIEWPORT_SIZE[0]-180,VIEWPORT_SIZE[1]-180))
+            #pixels = color.rgb2gray(pixels)
+            #pixels = transform.resize(pixels,(GRAYSCALE_DIM,GRAYSCALE_DIM))
+            #pixels = exposure.rescale_intensity(pixels, out_range=(0, 255))
+            #
+            #pygame.surfarray.blit_array(self.cover_display, pixels)
+        if not self.cover_display.get_locked() and not self.display.get_locked():    
+            self.display.blit(self.cover_display, (VIEWPORT_SIZE[0]-180,VIEWPORT_SIZE[1]-180))
         
         # ============= After input buffer is used for neural net draw HUD ===============
         # temp_menu.draw(viewport)
         col_text = f"Collisions: {'True' if collision else 'False'}"
+        point_text = f"Points: {self.points}"
+        fps_text = "FPS: {:.2f}".format(self.fps)
         self.font.render_to(self.display, (5, 5), col_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (5, 35), point_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (5, VIEWPORT_SIZE[1]-35), fps_text, RGBA_LIGHT_RED)
 
         # ========================= Swap the buffer to display ===========================
         #swap buffers
         pygame.display.flip()
 
     def start(self):
+        self.create_bounds()
         self.create_player_rect()
         self.create_random_rects()
+        
+        self.clock = pygame.time.Clock()
+        
         while True:
             self.store_input_keys()
+            
+            self.clock.tick(FRAME_RATE)
+            #self.clock.tick_busy_loop(FRAME_RATE) #This version will use more CPU
+            self.fps = self.clock.get_fps()
 
             # If escape is pressed, break main event loop
             if self.key_list[pygame.K_ESCAPE]:
                 self.pipe_conn.send(self.exit_keyword)
                 break
+                
+            if self.pipe_conn.poll():
+                print("grabbing event.")
+                reply = self.pipe_conn.recv()
+                self.update_keras_view(reply)
 
             self.update_positions()
             self.render_updates()
+            
+            

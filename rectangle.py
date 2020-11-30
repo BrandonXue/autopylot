@@ -1,7 +1,13 @@
 import pygame
+import rgb_colors
+
+#Environment types
+OBSTACLE=0
+GOAL=1
+##################
 
 class Rectangle:
-    def __init__(self, x=0.0, y=0.0, width=10, height=10):
+    def __init__(self, x=0.0, y=0.0, width=10, height=10, color=rgb_colors.RGB_BLACK):
         self.max_dim = width if width > height else height
 
         # Set position vectors
@@ -12,6 +18,7 @@ class Rectangle:
             pygame.math.Vector2(x, y+height)
         ]
         self.center_vec = pygame.math.Vector2(x + width/2, y + height/2)
+        self.color_ = color
 
     def pivot_and_offset(self, pivot_point, degrees, view_adjust):
         # For each corner, find a new vector pointing from pivot_point to it,
@@ -35,10 +42,21 @@ class Rectangle:
 
     def get_max_dim(self):
         return self.max_dim
+        
+    def draw(self, surface, coordinates):
+        pygame.draw.polygon(surface, self.color_, coordinates)
+        
+class EnvironmentRectangle(Rectangle):
+    def __init__(self, x=0, y=0, width=10, height=10, color=rgb_colors.RGB_GREEN, type=OBSTACLE):
+        super().__init__(x, y, width, height, color)
+        self.type_ = type
+        
+    def get_type(self):
+        return self.type_
 
 class PlayerRectangle(Rectangle):
     def __init__(self, x=0, y=0, width=10, height=10):
-        super().__init__(x, y, width, height) 
+        super().__init__(x, y, width, height, rgb_colors.RGB_BLUE) 
 
         # Set position and state
         # We want a position near the rear because cars pivot around rear axle
@@ -57,11 +75,6 @@ class PlayerRectangle(Rectangle):
 def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in format x, y. p1 and p2 together form a line and p3 and p4 together form a line
     v1 = p2 - p1
     v2 = p4 - p3
-
-    # odd1 = p3[0] - p1[0]
-    # odd2 = p1[1] - p3[1]
-    # numt = odd2*v2[0] + odd1*v2[1]
-    # nums = odd2*v1[0] + odd1*v1[1]
 
     odd = pygame.math.Vector2(p1[1] - p3[1], p3[0] - p1[0])
     numt = odd.dot(v2)
