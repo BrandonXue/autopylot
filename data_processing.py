@@ -15,10 +15,10 @@ class DataProcessor:
 
     def start(self):
     
-        with mss.mss() as sct:
-            monitor = sct.monitors[1]
-            sct_img = sct.grab(monitor)
-            print(sct_img)
+        #with mss.mss() as sct:
+        #    monitor = sct.monitors[1]
+        #    sct_img = sct.grab(monitor)
+        #    print(sct_img)
             
             
         while True:
@@ -32,7 +32,7 @@ class DataProcessor:
                 pixels = color.rgb2gray(received)
                 pixels = transform.resize(pixels,(GRAYSCALE_DIM,GRAYSCALE_DIM))
                 pixels = exposure.rescale_intensity(pixels, out_range=(0, 255))
-                print(pixels)
+                #print(pixels)
                 
                 if dill.pickles(pixels):
                     self.pipe_conn.send(pixels)

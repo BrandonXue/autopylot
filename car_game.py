@@ -33,7 +33,7 @@ class CarGame:
         # Display related
         self.display = pygame.display.set_mode(
             VIEWPORT_SIZE,
-            pygame.DOUBLEBUF | pygame.HWSURFACE
+            pygame.DOUBLEBUF | pygame.HWSURFACE #| pygame.FULLSCREEN
         )
         self.display.set_alpha(None)
 
@@ -302,6 +302,7 @@ class CarGame:
         while True:
             self.store_input_keys()
             
+            #self.clock.tick()
             self.clock.tick(FRAME_RATE)
             #self.clock.tick_busy_loop(FRAME_RATE) #This version will use more CPU
             self.fps = self.clock.get_fps()
