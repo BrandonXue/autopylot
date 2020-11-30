@@ -42,7 +42,7 @@ class DataProcessor:
             # TODO: Train neural net here
             pixels = np.array(sct.grab(monitor)).astype('float32')
             pixels = cv2.cvtColor(pixels, cv2.COLOR_RGBA2GRAY)
-            pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM)) / 255
+            pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))# / 255
             #pixels = np.transpose(pixels.astype('float64'), (1,0,2))
             pixels = np.transpose(pixels, (1,0))
             

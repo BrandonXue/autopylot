@@ -67,6 +67,38 @@ class CarGame:
         self.cover_display.fill(RGB_WHITE)
         pygame.surfarray.blit_array(self.cover_display, pixels) 
         
+    def load_map_from_file(self, filepath):
+        in_file = open(filepath) #default read only
+        
+        i = 0
+        
+        self.rects = []
+        self.reward_dot_pool = []
+        
+        for line in in_file.readlines():
+            j = 0
+            for object_code in line:
+                if object_code == '0':
+                    self.reward_dot_pool.append((i, j))
+                elif object_code == '1':
+                    self.rects.append(
+                        EnvironmentRectangle(
+                            i*MAX_BOX_WIDTH, j*MAX_BOX_HEIGHT, # Location coords
+                            MAX_BOX_WIDTH, MAX_BOX_HEIGHT, RGB_BLACK # width height
+                        )
+                    )
+                elif object_code == '2':
+                    self.player_rect = PlayerRectangle(
+                        i*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, 
+                        j*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
+                        CAR_WIDTH, CAR_HEIGHT
+                    )   
+                j = j+1
+            i = i+1
+        in_file.close()
+        self.add_goat_rect_from_pool()
+    
+    ##USE ONLY FOR RANDOM MAPS
     def create_bounds(self):
         self.bounds = []
         self.bounds.append(
@@ -100,8 +132,7 @@ class CarGame:
                     100, 100, RGB_BLACK # width height
                 )
             )
-        
-
+       
     def create_player_rect(self):
         self.player_rect = PlayerRectangle(0, 0, CAR_WIDTH, CAR_HEIGHT)
         
@@ -120,7 +151,8 @@ class CarGame:
                 25, 25, RGB_GOLD, GOAL
             )
         )
-        
+    ##END USE ONLY FOR RANDOM MAPS
+    
     #function for updating goal (will be a rectangle)
     def udpate_goal_rect(self):
         self.rects.pop() #goal rect should always be last
@@ -131,6 +163,19 @@ class CarGame:
             )
         )
 
+    def add_goat_rect_from_pool(self):
+        location = self.reward_dot_pool[randint(0, len(self.reward_dot_pool))]
+        self.rects.append(
+            EnvironmentRectangle(
+                location[0]*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, location[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
+                25, 25, RGB_GOLD, GOAL
+            )
+        )
+        
+    def update_goal_rect_from_pool(self):
+        self.rects.pop()
+        self.add_goat_rect_from_pool()
+    
     def store_input_keys(self):
         for event in pygame.event.get():
             # Treat quit event as escape button pressed
@@ -220,21 +265,21 @@ class CarGame:
 
         self.collision = False
         
-        for obj in self.bounds:
-
-            obj_center = obj.get_center()
-            max_viewable_dist = self.display_diag + obj.get_max_dim()
-
-            dist_between = player_center.distance_to(obj_center)
-            if (dist_between < max_viewable_dist):
-
-                object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
-                
-                if (not self.collision and dist_between < self.collision_check_dist):
-                    if check_collision(player_coords, object_coords):
-                        self.collision = True
-                
-                obj.draw(self.display, object_coords)
+        #for obj in self.bounds:
+        #
+        #    obj_center = obj.get_center()
+        #    max_viewable_dist = self.display_diag + obj.get_max_dim()
+        #
+        #    dist_between = player_center.distance_to(obj_center)
+        #    if (dist_between < max_viewable_dist):
+        #
+        #        object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
+        #        
+        #        if (not self.collision and dist_between < self.collision_check_dist):
+        #            if check_collision(player_coords, object_coords):
+        #                self.collision = True
+        #        
+        #        obj.draw(self.display, object_coords)
         
         for obj in self.rects:
 
@@ -251,7 +296,8 @@ class CarGame:
                         self.collision = True
                         if obj.get_type() == GOAL:
                             self.points += 1
-                            self.udpate_goal_rect()
+                            #self.udpate_goal_rect()
+                            self.update_goal_rect_from_pool()
                 
                 obj.draw(self.display, object_coords)
 
@@ -275,9 +321,11 @@ class CarGame:
     
 
     def start(self):
-        self.create_bounds()
-        self.create_player_rect()
-        self.create_random_rects()
+        #self.create_bounds()
+        #self.create_player_rect()
+        #self.create_random_rects()
+        
+        self.load_map_from_file("GameMap_1.txt")
         
         self.clock = pygame.time.Clock()
         

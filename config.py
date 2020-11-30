@@ -28,13 +28,13 @@ MAP_HEIGHT = {
 }[CURRENT_USER]
 
 MAX_BOX_WIDTH = {
-    'Brandon Xue': 175,
-    'Jacob Rapmund': 175
+    'Brandon Xue': 100,
+    'Jacob Rapmund': 100
 }[CURRENT_USER]
 
 MAX_BOX_HEIGHT = {
-    'Brandon Xue': 175,
-    'Jacob Rapmund': 175
+    'Brandon Xue': 100,
+    'Jacob Rapmund': 100
 }[CURRENT_USER]
 
 MIN_BOX_WIDTH = {
