@@ -1,10 +1,7 @@
 from config import *
 from defs import ExitSignalType
 
-from skimage import color, transform, exposure
-
 import cv2
-import dill
 import mss
 import numpy as np
 
@@ -12,12 +9,9 @@ import tensorflow as tf
 from tensorflow import keras
 
 class DataProcessor:
-    def __init__(self, pipe_conn, exit_signal):
-        self.pipe_conn = pipe_conn
-        self.exit_signal = exit_signal
-
-    def close_pipe(self):
-        self.pipe_conn.close()
+    def __init__(self, read_conn, write_conn):
+        self.read_conn = read_conn
+        self.write_conn = write_conn
 
     def start(self):
             
@@ -37,10 +31,13 @@ class DataProcessor:
         
             
         while True:
-            if self.pipe_conn.poll():
-                received = self.pipe_conn.recv()
+            if self.read_conn.poll():
+                received = self.read_conn.recv()
+
+                # If exit signal received, perform handshake and return
                 if type(received) is ExitSignalType:
-                    break
+                    self.write_conn.send(ExitSignalType())
+                    return True
                 
             # TODO: Train neural net here
             pixels = np.array(sct.grab(monitor)).astype('float32')
@@ -49,7 +46,3 @@ class DataProcessor:
             #pixels = np.transpose(pixels.astype('float64'), (1,0,2))
             pixels = np.transpose(pixels, (1,0))
             
-            
-            
-            if dill.pickles(pixels):
-                self.pipe_conn.send(pixels)

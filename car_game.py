@@ -7,7 +7,6 @@ import pygame
 
 from math import sqrt, radians, sin, cos
 from random import randint
-from skimage import color, transform, exposure
     
 def clamp(value, min, max):
     if value > max:
@@ -17,13 +16,15 @@ def clamp(value, min, max):
     return value
 
 class CarGame:
-    def __init__(self, pipe_conn, exit_signal):
+    def __init__(self, read_conn, write_conn):
         # We may want to init() selective modules (to look into if we have time)
         pygame.init()
 
         # Set inter-process communication properties
-        self.pipe_conn = pipe_conn
-        self.exit_signal = exit_signal
+        self.read_conn = read_conn
+        self.write_conn = write_conn
+
+        # Game environment related
         self.world_bounds = Rectangle(-MAX_X_LOC_BOX, -MAX_Y_LOC_BOX, MAP_WIDTH, MAP_HEIGHT, RGB_WHITE)
         self.points = 0
 
@@ -48,9 +49,6 @@ class CarGame:
         self.velocity = 0.0
         self.collision = False
 
-        # View transform related 
-        # self.view_pos = np.array([0., 0.]) # viewport position needs to center on object
-
         # Pre-calculated game constants 
         self.half_viewport = pygame.math.Vector2(VIEWPORT_SIZE)/2
         self.display_offset = self.half_viewport
@@ -63,11 +61,11 @@ class CarGame:
         )
 
         # Frame counter for throttling certain events
-        self.frame_count = 0
+        # self.frame_count = 0
         
-    def update_keras_view(self, pixels):
+    def draw_keras_view(self, pixels):
         self.cover_display.fill(RGB_WHITE)
-        pygame.surfarray.blit_array(self.cover_display, pixels)
+        pygame.surfarray.blit_array(self.cover_display, pixels) 
         
     def create_bounds(self):
         self.bounds = []
@@ -155,8 +153,6 @@ class CarGame:
                 self.key_list[event.key] = False
 
     def update_positions(self):
-        move_vec = pygame.math.Vector2(0.0, 0.0)
-
         pressed = False
 
         if self.key_list[pygame.K_w]:
@@ -195,10 +191,6 @@ class CarGame:
             self.rotation -= self.angular_velocity * self.velocity
 
         self.velocity = clamp(self.velocity, -CAR_MAX_VELOCITY, CAR_MAX_VELOCITY)
-
-        rads = radians(self.rotation)
-        move_vec[0] += sin(rads) * self.velocity
-        move_vec[1] += cos(rads) * self.velocity
         
         if not pressed:
             if self.velocity < CAR_VELOCITY_ZERO_THRESHOLD and self.velocity > -CAR_VELOCITY_ZERO_THRESHOLD:
@@ -208,13 +200,12 @@ class CarGame:
                 
         pressed = False
 
-        # Move player position based on movement vector
-        self.player_rect.move(move_vec)
+        # Move player position, (you can add tuple to Vector2)
+        rads = radians(self.rotation)
+        self.player_rect.move( (sin(rads) * self.velocity, cos(rads) * self.velocity) )
 
-    def render_updates(self):
-        # Fill background color
-        self.display.fill(RGB_WHITE)
-        
+
+    def draw_game_scene(self):
         # These locations are used as references
         player_center = self.player_rect.get_center()
         rear_axle = self.player_rect.get_rear_center()
@@ -227,7 +218,7 @@ class CarGame:
         
         self.player_rect.draw(self.display, player_coords)
 
-        collision = False
+        self.collision = False
         
         for obj in self.bounds:
 
@@ -239,9 +230,9 @@ class CarGame:
 
                 object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
                 
-                if (not collision and dist_between < self.collision_check_dist):
+                if (not self.collision and dist_between < self.collision_check_dist):
                     if check_collision(player_coords, object_coords):
-                        collision = True
+                        self.collision = True
                 
                 obj.draw(self.display, object_coords)
         
@@ -255,36 +246,33 @@ class CarGame:
 
                 object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
                 
-                if (not collision and dist_between < self.collision_check_dist):
+                if (not self.collision and dist_between < self.collision_check_dist):
                     if check_collision(player_coords, object_coords):
-                        collision = True
+                        self.collision = True
                         if obj.get_type() == GOAL:
                             self.points += 1
                             self.udpate_goal_rect()
                 
                 obj.draw(self.display, object_coords)
-        
-        # ============== After scene is drawn, but before overhead display ===============
-        self.frame_count = (self.frame_count + 1) % (FRAME_RATE//60)
+
+    def draw_dashboard(self):
+        # self.frame_count = (self.frame_count + 1) % (FRAME_RATE//60)
         #if self.key_list[pygame.K_p] and self.frame_count == 0:
         #    pixels = pygame.surfarray.pixels3d(self.display)
         #    self.pipe_conn.send(pixels)
             
-        if not self.cover_display.get_locked() and not self.display.get_locked():    
-            self.display.blit(self.cover_display, (VIEWPORT_SIZE[0]-180,VIEWPORT_SIZE[1]-180))
+        if not self.cover_display.get_locked() and not self.display.get_locked():
+            self.display.blit(self.cover_display, (VIEWPORT_WIDTH-180, VIEWPORT_HEIGHT-180))
         
-        # ============= After input buffer is used for neural net draw HUD ===============
         # temp_menu.draw(viewport)
-        col_text = f"Collisions: {'True' if collision else 'False'}"
+        col_text = f"Collisions: {'True' if self.collision else 'False'}"
         point_text = f"Points: {self.points}"
         fps_text = "FPS: {:.2f}".format(self.fps)
         self.font.render_to(self.display, (5, 5), col_text, RGBA_LIGHT_RED)
         self.font.render_to(self.display, (5, 35), point_text, RGBA_LIGHT_RED)
-        self.font.render_to(self.display, (5, VIEWPORT_SIZE[1]-35), fps_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (5, VIEWPORT_HEIGHT-35), fps_text, RGBA_LIGHT_RED)
 
-        # ========================= Swap the buffer to display ===========================
-        #swap buffers
-        pygame.display.flip()
+    
 
     def start(self):
         self.create_bounds()
@@ -294,23 +282,35 @@ class CarGame:
         self.clock = pygame.time.Clock()
         
         while True:
-            self.store_input_keys()
-            
-            #self.clock.tick()
+            # Mange framerate
             self.clock.tick(FRAME_RATE)
             #self.clock.tick_busy_loop(FRAME_RATE) #This version will use more CPU
             self.fps = self.clock.get_fps()
 
+            # Get input events
+            self.store_input_keys()
+
             # If escape is pressed, break main event loop
             if self.key_list[pygame.K_ESCAPE]:
-                self.pipe_conn.send(self.exit_signal)
-                break
-                
-            if self.pipe_conn.poll():
-                reply = self.pipe_conn.recv()
-                self.update_keras_view(reply)
+                # Send exit signal and wait for handshake 
+                self.write_conn.send(ExitSignalType())
+                while not type(self.read_conn.recv()) == ExitSignalType: pass
+                return True
 
+            # Fill background color
+            self.display.fill(RGB_WHITE)
+
+            # Draw player, rectangles, etc.
+            self.draw_game_scene()
+            # Update player position
             self.update_positions()
-            self.render_updates()
-            
-            
+
+            # See if there are any updates from data processor
+            if self.read_conn.poll():
+                reply = self.read_conn.recv()
+                self.draw_keras_view(reply)
+
+            self.draw_dashboard()
+
+            # Swap buffers
+            pygame.display.flip()

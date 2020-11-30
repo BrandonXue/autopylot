@@ -2,8 +2,7 @@
 # For user configurations, please see config.py
 
 # Sigterm type
-class ExitSignalType:
-    pass
+class ExitSignalType: pass
 
 # RGB colorvalues
 RGB_BLACK = (0, 0, 0)
