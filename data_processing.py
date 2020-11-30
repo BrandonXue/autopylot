@@ -1,14 +1,17 @@
 from config import *
+from defs import ExitSignalType
+
 from skimage import color, transform, exposure
 import dill
-# import tensorflow as tf
+# import mss
 
+# import tensorflow as tf
 # from tensorflow import keras
 
 class DataProcessor:
-    def __init__(self, pipe_conn, exit_keyword):
+    def __init__(self, pipe_conn, exit_signal):
         self.pipe_conn = pipe_conn
-        self.exit_keyword = exit_keyword
+        self.exit_signal = exit_signal
 
     def close_pipe(self):
         self.pipe_conn.close()
@@ -24,7 +27,7 @@ class DataProcessor:
         while True:
             if self.pipe_conn.poll():
                 received = self.pipe_conn.recv()
-                if received == self.exit_keyword:
+                if type(received) is ExitSignalType:
                     break
 
                 # TODO: Train neural net here

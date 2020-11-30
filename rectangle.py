@@ -1,5 +1,5 @@
 import pygame
-import rgb_colors
+from defs import *
 
 #Environment types
 OBSTACLE=0
@@ -7,7 +7,7 @@ GOAL=1
 ##################
 
 class Rectangle:
-    def __init__(self, x=0.0, y=0.0, width=10, height=10, color=rgb_colors.RGB_BLACK):
+    def __init__(self, x=0.0, y=0.0, width=10, height=10, color=RGB_BLACK):
         self.max_dim = width if width > height else height
 
         # Set position vectors
@@ -47,7 +47,7 @@ class Rectangle:
         pygame.draw.polygon(surface, self.color_, coordinates)
         
 class EnvironmentRectangle(Rectangle):
-    def __init__(self, x=0, y=0, width=10, height=10, color=rgb_colors.RGB_GREEN, type=OBSTACLE):
+    def __init__(self, x=0, y=0, width=10, height=10, color=RGB_GREEN, type=OBSTACLE):
         super().__init__(x, y, width, height, color)
         self.type_ = type
         
@@ -56,7 +56,7 @@ class EnvironmentRectangle(Rectangle):
 
 class PlayerRectangle(Rectangle):
     def __init__(self, x=0, y=0, width=10, height=10):
-        super().__init__(x, y, width, height, rgb_colors.RGB_BLUE) 
+        super().__init__(x, y, width, height, RGB_BLUE) 
 
         # Set position and state
         # We want a position near the rear because cars pivot around rear axle

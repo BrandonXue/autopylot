@@ -1,3 +1,10 @@
+# This file is for constant definitions
+# For user configurations, please see config.py
+
+# Sigterm type
+class ExitSignalType:
+    pass
+
 # RGB colorvalues
 RGB_BLACK = (0, 0, 0)
 RGB_WHITE = (255, 255, 255)
