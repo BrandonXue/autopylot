@@ -1,4 +1,5 @@
-import pygame
+from pygame.math import Vector2
+from pygame.draw import polygon
 from defs import *
 
 #Environment types
@@ -12,12 +13,12 @@ class Rectangle:
 
         # Set position vectors
         self.corners = [
-            pygame.math.Vector2(x, y),
-            pygame.math.Vector2(x+width, y),
-            pygame.math.Vector2(x+width, y+height),
-            pygame.math.Vector2(x, y+height)
+            Vector2(x, y),
+            Vector2(x+width, y),
+            Vector2(x+width, y+height),
+            Vector2(x, y+height)
         ]
-        self.center_vec = pygame.math.Vector2(x + width/2, y + height/2)
+        self.center_vec = Vector2(x + width/2, y + height/2)
         self.color_ = color
 
     def pivot_and_offset(self, pivot_point, degrees, view_adjust):
@@ -30,7 +31,7 @@ class Rectangle:
             (self.corners[3] - pivot_point).rotate(degrees) + view_adjust
         )
   
-    def move(self, move_vec: pygame.math.Vector2 = pygame.math.Vector2(0.0, 0.0)):
+    def move(self, move_vec: Vector2 = Vector2(0.0, 0.0)):
         self.corners[0] += move_vec
         self.corners[1] += move_vec
         self.corners[2] += move_vec
@@ -44,7 +45,7 @@ class Rectangle:
         return self.max_dim
         
     def draw(self, surface, coordinates):
-        pygame.draw.polygon(surface, self.color_, coordinates)
+        polygon(surface, self.color_, coordinates)
         
 class EnvironmentRectangle(Rectangle):
     def __init__(self, x=0, y=0, width=10, height=10, color=RGB_GREEN, type=OBSTACLE):
@@ -60,7 +61,7 @@ class PlayerRectangle(Rectangle):
 
         # Set position and state
         # We want a position near the rear because cars pivot around rear axle
-        self.rear_center_vec = pygame.math.Vector2(x + width/2, y + height * 0.8)
+        self.rear_center_vec = Vector2(x + width/2, y + height * 0.8)
 
     def is_colliding(self):
         return self.collision
@@ -68,7 +69,7 @@ class PlayerRectangle(Rectangle):
     def get_rear_center(self):
         return self.rear_center_vec
 
-    def move(self, move_vec:pygame.math.Vector2 = pygame.math.Vector2(0.0, 0.0)):
+    def move(self, move_vec: Vector2 = Vector2(0.0, 0.0)):
         super().move(move_vec)
         self.rear_center_vec += move_vec
 
@@ -76,7 +77,7 @@ def lin_seg_intersection(p1, p2, p3, p4): #p is a point either tuple or list in 
     v1 = p2 - p1
     v2 = p4 - p3
 
-    odd = pygame.math.Vector2(p1[1] - p3[1], p3[0] - p1[0])
+    odd = Vector2(p1[1] - p3[1], p3[0] - p1[0])
     numt = odd.dot(v2)
     nums = odd.dot(v1)
 

@@ -1,6 +1,5 @@
 from car_game import CarGame
 from data_processing import DataProcessor
-from defs import ExitSignalType
 
 from multiprocessing import Process, Pipe
 
@@ -13,18 +12,24 @@ def start_game(pipe_connection, exit_signal):
     car_game.start()
 
 def main():
-    exit_signal = ExitSignalType() # define a message to be sent from game_proc to data_proc to terminate
-    #read_end, write_end = Pipe(False)   # use a pipe for inter-process communication
-    read_end, write_end = Pipe(True)
+    # Use two pipes because one process writing too quickly will fill up the pipe
+    # read_end, write_end = Pipe(False)
+    data_read_end, game_write_end = Pipe(duplex=False)
+    game_read_end, data_write_end = Pipe(duplex=False)
 
     # Create a separate process for the game and for data processing
-    data_proc = Process(target=start_data_processing, args=(read_end, exit_signal))
-    game_proc = Process(target=start_game, args=(write_end, exit_signal))
+    data_proc = Process(
+        target=start_data_processing,
+        args=(data_read_end, data_write_end)
+    )
+    game_proc = Process(
+        target=start_game,
+        args=(game_read_end, game_write_end)
+    )
 
     # Start both processes
     data_proc.start()
     game_proc.start()
-    
 
     # Wait for processes to finish
     data_proc.join()
