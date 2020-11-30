@@ -127,3 +127,8 @@ GRAYSCALE_DIM = {
     'Brandon Xue': 50,
     'Jacob Rapmund': 80
 }[CURRENT_USER]
+
+NUMBER_OF_DOTS = {
+    'Brandon Xue': 20,
+    'Jacob Rapmund': 20
+}[CURRENT_USER]

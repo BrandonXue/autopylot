@@ -88,6 +88,7 @@ class CarGame:
                         )
                     )
                 elif object_code == '2':
+                    self.player_start_pos = (i, j)
                     self.player_rect = PlayerRectangle(
                         i*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, 
                         j*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
@@ -96,7 +97,7 @@ class CarGame:
                 j = j+1
             i = i+1
         in_file.close()
-        self.add_goat_rect_from_pool()
+        self.add_goat_rects_from_pool()
     
     ##USE ONLY FOR RANDOM MAPS
     def create_bounds(self):
@@ -155,7 +156,7 @@ class CarGame:
     
     #function for updating goal (will be a rectangle)
     def udpate_goal_rect(self):
-        self.rects.pop() #goal rect should always be last
+        self.rects.pop() #goal rect should always be last when using only one goal rect
         self.rects.append(
             EnvironmentRectangle(
                 randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), 
@@ -163,18 +164,19 @@ class CarGame:
             )
         )
 
-    def add_goat_rect_from_pool(self):
-        location = self.reward_dot_pool[randint(0, len(self.reward_dot_pool))]
-        self.rects.append(
-            EnvironmentRectangle(
-                location[0]*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, location[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
-                25, 25, RGB_GOLD, GOAL
+    def add_goat_rects_from_pool(self): #needs set alive function
+        for i in range(0, NUMBER_OF_DOTS):
+            location = self.reward_dot_pool[randint(0, len(self.reward_dot_pool))]
+            self.reward_dot_pool.remove(location)
+            self.rects.append(
+                EnvironmentRectangle(
+                    location[0]*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, location[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
+                    25, 25, RGB_GOLD, GOAL
+                )
             )
-        )
-        
-    def update_goal_rect_from_pool(self):
-        self.rects.pop()
-        self.add_goat_rect_from_pool()
+    
+    def remove_goal_rect(self, goal_rect):
+        self.goal_rects.remove(goal_rect)
     
     def store_input_keys(self):
         for event in pygame.event.get():
@@ -282,24 +284,25 @@ class CarGame:
         #        obj.draw(self.display, object_coords)
         
         for obj in self.rects:
-
-            obj_center = obj.get_center()
-            max_viewable_dist = self.display_diag + obj.get_max_dim()
-
-            dist_between = player_center.distance_to(obj_center)
-            if (dist_between < max_viewable_dist):
-
-                object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
                 
-                if (not self.collision and dist_between < self.collision_check_dist):
-                    if check_collision(player_coords, object_coords):
-                        self.collision = True
-                        if obj.get_type() == GOAL:
-                            self.points += 1
-                            #self.udpate_goal_rect()
-                            self.update_goal_rect_from_pool()
-                
-                obj.draw(self.display, object_coords)
+            if obj.get_is_alive():
+                obj_center = obj.get_center()
+                max_viewable_dist = self.display_diag + obj.get_max_dim()
+
+                dist_between = player_center.distance_to(obj_center)
+                if (dist_between < max_viewable_dist):
+
+                    object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
+                    
+                    if (not self.collision and dist_between < self.collision_check_dist):
+                        if check_collision(player_coords, object_coords):
+                            self.collision = True
+                            if obj.get_type() == GOAL:
+                                self.points += 1
+                                obj.set_is_alive(False)
+                                #self.udpate_goal_rect()
+                    
+                    obj.draw(self.display, object_coords)
 
     def draw_dashboard(self):
         # self.frame_count = (self.frame_count + 1) % (FRAME_RATE//60)

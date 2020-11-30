@@ -51,9 +51,16 @@ class EnvironmentRectangle(Rectangle):
     def __init__(self, x=0, y=0, width=10, height=10, color=RGB_GREEN, type=OBSTACLE):
         super().__init__(x, y, width, height, color)
         self.type_ = type
+        self.is_alive = True
         
     def get_type(self):
         return self.type_
+        
+    def set_is_alive(self, is_alive):
+        self.is_alive = is_alive
+        
+    def get_is_alive(self):
+        return self.is_alive
 
 class PlayerRectangle(Rectangle):
     def __init__(self, x=0, y=0, width=10, height=10):
