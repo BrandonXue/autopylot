@@ -16,7 +16,10 @@ def clamp(value, min, max):
     return value
 
 class CarGame:
-    def __init__(self, read_conn, write_conn):
+    def __init__(self, read_conn, write_conn, game_mode, data_mode):
+        self.data_mode = data_mode
+        self.game_mode = game_mode
+
         # We may want to init() selective modules (to look into if we have time)
         pygame.init()
 
@@ -374,10 +377,18 @@ class CarGame:
             # Update player position
             self.update_positions()
 
-            # See if there are any updates from data processor
-            if self.read_conn.poll():
+            # Send information
+            if self.data_mode == 'pipe':
+                pixels = pygame.surfarray.pixels3d(self.display)
+                self.write_conn.send(pixels)
                 reply = self.read_conn.recv()
                 self.draw_keras_view(reply)
+
+            # See if there are any updates from data processor
+            elif self.data_mode == 'mss':
+                if self.read_conn.poll():
+                    reply = self.read_conn.recv()
+                    self.draw_keras_view(reply)
 
             self.draw_dashboard()
 
