@@ -4,6 +4,8 @@ from tensorflow.python.ops.gen_math_ops import mod
 from config import *
 from defs import ExitSignalType
 
+from skimage import color, transform, exposure
+import dill
 import cv2
 import mss
 import numpy as np
@@ -226,10 +228,10 @@ class DataProcessor:
     def start_play_mode(self):
         while True:
             # Receive some data and process it a little
-            received = self.get_event_step()
+            state = self.get_event_step()
 
             # Send it back for HUD display
-            self.pipe_image(received)
+            self.pipe_image(state[0])
 
     def get_event_step(self):
         if self.data_mode == 'mss':
@@ -245,7 +247,8 @@ class DataProcessor:
         
     def exit_procedure(self):  
         self.write_conn.send(ExitSignalType())
-        sys.exit()
+        # do some saving
+        return
 
     def setup_mss(self):
         self.sct = mss.mss()
@@ -260,20 +263,22 @@ class DataProcessor:
         }
 
     def mss_event_step(self):
-        if self.read_conn.poll():
-            received = self.read_conn.recv()
+        received = self.read_conn.recv()
 
-            # If exit signal received, perform handshake and return
-            if type(received) is ExitSignalType:
-                self.exit_procedure() # exits program
+        # If exit signal received, perform handshake and return
+        if type(received) is ExitSignalType:
+            self.exit_procedure()
+            exit()
             
-        # TODO: Train neural net here
         pixels = np.array(self.sct.grab(self.monitor)).astype('float32')
         pixels = cv2.cvtColor(pixels, cv2.COLOR_RGBA2GRAY)
         pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))# / 255
         #pixels = np.transpose(pixels.astype('float64'), (1,0,2))
         pixels = np.transpose(pixels, (1,0))
-        return pixels
+
+        # Observation, reward, done, info
+        state = (pixels, received[1], received[2], None)
+        return state
             
 
     def pipe_image(self, pixels):
@@ -284,10 +289,13 @@ class DataProcessor:
 
         # If exit signal received, perform handshake and return
         if type(received) is ExitSignalType:
-            self.exit_procedure() # exits program
+            self.exit_procedure()
+            exit()
         
-        pixels = received
-        pixels = cv2.cvtColor(pixels, cv2.COLOR_RGBA2GRAY)
+        pixels = received[0]
+        pixels = np.array(pixels).astype('float32')
+        pixels = cv2.cvtColor(pixels, cv2.COLOR_RGB2GRAY)
         pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))# / 255
-        pixels = np.transpose(pixels, (1,0))
-        return pixels
+        
+        state = (pixels, received[1], received[2], None)
+        return state

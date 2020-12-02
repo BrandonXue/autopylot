@@ -30,6 +30,7 @@ class CarGame:
         # Game environment related
         self.world_bounds = Rectangle(-MAX_X_LOC_BOX, -MAX_Y_LOC_BOX, MAP_WIDTH, MAP_HEIGHT, RGB_WHITE)
         self.points = 0
+        self.reward = 0 # for reinforcement learning
 
         # Keyboard related
         self.key_list = [False] * KEY_ARRAY_SIZE # Lists are faster for simple random access
@@ -67,7 +68,7 @@ class CarGame:
         # self.frame_count = 0
         
     def reset_map(self):
-        self.rects = self.rects[:(self.points - NUMBER_OF_DOTS)]
+        # self.rects = self.rects[:(self.points - NUMBER_OF_DOTS)]
         self.points = 0
         self.rotation = 0.0
         self.angular_velocity = 0.0 # Can think of this as steering wheel position
@@ -77,11 +78,11 @@ class CarGame:
             self.player_start_pos[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
             CAR_WIDTH, CAR_HEIGHT
         )
-        self.add_goat_rects_from_pool()
+        self.add_goal_rects_from_pool()
         
     def draw_keras_view(self, pixels):
-        self.cover_display.fill(RGB_WHITE)
-        pygame.surfarray.blit_array(self.cover_display, pixels) 
+        # self.cover_display.fill(RGB_WHITE)
+        pygame.surfarray.blit_array(self.cover_display, pixels)
         
     def load_map_from_file(self, filepath):
         in_file = open(filepath) #default read only
@@ -113,79 +114,80 @@ class CarGame:
                 j = j+1
             i = i+1
         in_file.close()
-        self.add_goat_rects_from_pool()
+        self.add_goal_rects_from_pool()
     
     ##USE ONLY FOR RANDOM MAPS
-    def create_bounds(self):
-        self.bounds = []
-        self.bounds.append(
-            EnvironmentRectangle(
-                -2000, -2000, # Location coords
-                100, 100, RGB_BLACK # width height
-            )
-        )
-        for i in range(1, 40):
-            self.bounds.append(
-                EnvironmentRectangle(
-                    i*100-2000, -2000, # Location coords
-                    100, 100, RGB_BLACK # width height
-                )
-            )
-            self.bounds.append(
-                EnvironmentRectangle(
-                    39*100-2000, i*100-2000, # Location coords
-                    100, 100, RGB_BLACK # width height
-                )
-            )
-            self.bounds.append(
-                EnvironmentRectangle(
-                    i*100-2000, 39*100-2000, # Location coords
-                    100, 100, RGB_BLACK # width height
-                )
-            )
-            self.bounds.append(
-                EnvironmentRectangle(
-                    -2000, i*100-2000, # Location coords
-                    100, 100, RGB_BLACK # width height
-                )
-            )
+    # def create_bounds(self):
+    #     self.bounds = []
+    #     self.bounds.append(
+    #         EnvironmentRectangle(
+    #             -2000, -2000, # Location coords
+    #             100, 100, RGB_BLACK # width height
+    #         )
+    #     )
+    #     for i in range(1, 40):
+    #         self.bounds.append(
+    #             EnvironmentRectangle(
+    #                 i*100-2000, -2000, # Location coords
+    #                 100, 100, RGB_BLACK # width height
+    #             )
+    #         )
+    #         self.bounds.append(
+    #             EnvironmentRectangle(
+    #                 39*100-2000, i*100-2000, # Location coords
+    #                 100, 100, RGB_BLACK # width height
+    #             )
+    #         )
+    #         self.bounds.append(
+    #             EnvironmentRectangle(
+    #                 i*100-2000, 39*100-2000, # Location coords
+    #                 100, 100, RGB_BLACK # width height
+    #             )
+    #         )
+    #         self.bounds.append(
+    #             EnvironmentRectangle(
+    #                 -2000, i*100-2000, # Location coords
+    #                 100, 100, RGB_BLACK # width height
+    #             )
+    #         )
        
-    def create_player_rect(self):
-        self.player_rect = PlayerRectangle(0, 0, CAR_WIDTH, CAR_HEIGHT)
+    # def create_player_rect(self):
+    #     self.player_rect = PlayerRectangle(0, 0, CAR_WIDTH, CAR_HEIGHT)
         
-    def create_random_rects(self):
-        self.rects = []
-        for i in range(0, 50):
-            self.rects.append(
-                EnvironmentRectangle(
-                    randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), # Location coords
-                    randint(MIN_BOX_WIDTH, MAX_BOX_WIDTH), randint(MIN_BOX_HEIGHT, MAX_BOX_HEIGHT) # width height
-                )
-            )
-        self.rects.append(
-            EnvironmentRectangle(
-                randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), 
-                25, 25, RGB_GOLD, GOAL
-            )
-        )
+    # def create_random_rects(self):
+    #     self.rects = []
+    #     for i in range(0, 50):
+    #         self.rects.append(
+    #             EnvironmentRectangle(
+    #                 randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), # Location coords
+    #                 randint(MIN_BOX_WIDTH, MAX_BOX_WIDTH), randint(MIN_BOX_HEIGHT, MAX_BOX_HEIGHT) # width height
+    #             )
+    #         )
+    #     self.rects.append(
+    #         EnvironmentRectangle(
+    #             randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), 
+    #             25, 25, RGB_GOLD, GOAL
+    #         )
+    #     )
     ##END USE ONLY FOR RANDOM MAPS
     
     #function for updating goal (will be a rectangle)
-    def update_goal_rect(self):
-        self.rects.pop() #goal rect should always be last when using only one goal rect
-        self.rects.append(
-            EnvironmentRectangle(
-                randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), 
-                25, 25, RGB_GOLD, GOAL
-            )
-        )
+    # def update_goal_rect(self):
+    #     self.rects.pop() #goal rect should always be last when using only one goal rect
+    #     self.rects.append(
+    #         EnvironmentRectangle(
+    #             randint(-MAX_X_LOC_BOX, MAX_X_LOC_BOX), randint(-MAX_Y_LOC_BOX, MAX_Y_LOC_BOX), 
+    #             25, 25, RGB_GOLD, GOAL
+    #         )
+    #     )
 
-    def add_goat_rects_from_pool(self): #needs set alive function
+    def add_goal_rects_from_pool(self): #needs set alive function
+        self.goal_rects = []
         temp_pool = self.reward_dot_pool.copy()
         for i in range(0, NUMBER_OF_DOTS):
             location = temp_pool[randint(0, len(temp_pool)-1)]
             temp_pool.remove(location)
-            self.rects.append(
+            self.goal_rects.append(
                 EnvironmentRectangle(
                     location[0]*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, location[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
                     25, 25, RGB_GOLD, GOAL
@@ -300,7 +302,11 @@ class CarGame:
         #        
         #        obj.draw(self.display, object_coords)
         
-        for obj in self.rects:
+        self.handle_rect_list(self.rects, player_center, player_coords, rear_axle)
+        self.handle_rect_list(self.goal_rects, player_center, player_coords, rear_axle)
+
+    def handle_rect_list(self, rect_list, player_center, player_coords, rear_axle):
+        for obj in rect_list:
                 
             if obj.get_is_alive():
                 obj_center = obj.get_center()
@@ -316,30 +322,28 @@ class CarGame:
                             self.collision = True
                             if obj.get_type() == GOAL:
                                 #big reward
-                                self.points += 1
+                                self.reward = 1000
                                 obj.set_is_alive(False)
                                 #self.update_goal_rect()
                             else:
+                                self.rewards = -1000
+                                self.mark_reset = True
                                 #big penalty
-                                self.reset_map()
+                            return # Early exit on collide
                     
                     obj.draw(self.display, object_coords)
 
     def draw_dashboard(self):
-        # self.frame_count = (self.frame_count + 1) % (FRAME_RATE//60)
-        #if self.key_list[pygame.K_p] and self.frame_count == 0:
-        #    pixels = pygame.surfarray.pixels3d(self.display)
-        #    self.pipe_conn.send(pixels)
             
         if not self.cover_display.get_locked() and not self.display.get_locked():
             self.display.blit(self.cover_display, (VIEWPORT_WIDTH-180, VIEWPORT_HEIGHT-180))
         
         # temp_menu.draw(viewport)
-        col_text = f"Collisions: {'True' if self.collision else 'False'}"
-        point_text = f"Points: {self.points}"
+        reward_text = f"Reward: {self.reward}"
+        # point_text = f"Points: {self.points}"
         fps_text = "FPS: {:.2f}".format(self.fps)
-        self.font.render_to(self.display, (5, 5), col_text, RGBA_LIGHT_RED)
-        self.font.render_to(self.display, (5, 35), point_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (5, 5), reward_text, RGBA_LIGHT_RED)
+        # self.font.render_to(self.display, (5, 35), point_text, RGBA_LIGHT_RED)
         self.font.render_to(self.display, (5, VIEWPORT_HEIGHT-35), fps_text, RGBA_LIGHT_RED)
 
     
@@ -372,25 +376,40 @@ class CarGame:
             # Fill background color
             self.display.fill(RGB_WHITE)
 
+            self.mark_reset = False # If crashed during this step, draw_game_scene will set this to True
             # Draw player, rectangles, etc.
             self.draw_game_scene()
+
             # Update player position
             self.update_positions()
 
             # Send information
             if self.data_mode == 'pipe':
-                pixels = pygame.surfarray.pixels3d(self.display)
-                self.write_conn.send(pixels)
+                observation = pygame.surfarray.array3d(self.display)
+                reward = self.reward
+                done = self.collision
+                info = None
+                self.write_conn.send( (observation, reward, done, info) )
+
+            elif self.data_mode == 'mss':
+                observation = None
+                reward = self.reward
+                done = self.collision
+                info = None
+                self.write_conn.send( (observation, reward, done, info) )
+
+            # See if there are any updates from data processor
+            if self.read_conn.poll():
                 reply = self.read_conn.recv()
                 self.draw_keras_view(reply)
 
-            # See if there are any updates from data processor
-            elif self.data_mode == 'mss':
-                if self.read_conn.poll():
-                    reply = self.read_conn.recv()
-                    self.draw_keras_view(reply)
-
             self.draw_dashboard()
+
+            # Reward staying alive
+            self.reward += 1
 
             # Swap buffers
             pygame.display.flip()
+
+            if self.mark_reset == True:
+                self.reset_map()
