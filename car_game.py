@@ -446,11 +446,11 @@ class CarGame:
         #         self.turbulence = 1 if positive else -1
 
         if self.mark_reset:
-            self.reward = -100
+            self.reward = -1
         elif self.reached_goal:
-            self.reward = 100
+            self.reward = 1
         else:
-            self.reward = 10 * fabs(self.velocity)
+            self.reward = 0.2 * fabs(self.velocity)
 
     def start(self):
         #self.create_bounds()
@@ -486,8 +486,11 @@ class CarGame:
                 self.add_frame_to_buffer()
                 if self.frame_count == 0:
                     self.pipe_buffer() # Send information from the environment to data processor
-
-                    reply = self.read_conn.recv()
+                    try:
+                        reply = self.read_conn.recv()
+                    except EOFError:
+                        self.reset_map()
+                        continue
                     self.interpret_actions(reply[0])
                     self.draw_observation(reply[1])
 
