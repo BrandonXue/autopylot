@@ -1,11 +1,9 @@
-import sys
+from operator import ne
 from numpy.core.getlimits import iinfo
 from tensorflow.python.ops.gen_math_ops import mod
 from config import *
 from defs import ExitSignalType
 
-from skimage import color, transform, exposure
-import dill
 import cv2
 import mss
 import numpy as np
@@ -23,9 +21,9 @@ class DataProcessor:
         self.write_conn = write_conn
 
     def create_q_model(self):
-        self.num_actions = 4
+        self.num_actions = 8
         # Network defined by the Deepmind paper
-        inputs = layers.Input(shape=(80, 80, 4,))
+        inputs = layers.Input(shape=(4, 80, 80, 1))
 
         # Convolutions on the frames on the screen
         layer1 = layers.Conv2D(32, 8, strides=4, activation="relu")(inputs)
@@ -71,12 +69,12 @@ class DataProcessor:
         optimizer = keras.optimizers.Adam(learning_rate=0.00025, clipnorm=1.0)
 
         # Experience replay buffers
-        action_history = []
-        state_history = []
-        state_next_history = []
-        rewards_history = []
-        done_history = []
-        episode_reward_history = []
+        self.action_history = []
+        self.state_history = []
+        self.state_next_history = []
+        self.rewards_history = []
+        self.done_history = []
+        self.episode_reward_history = []
         running_reward = 0
         episode_count = 0
         frame_count = 0
@@ -86,7 +84,7 @@ class DataProcessor:
         epsilon_greedy_frames = 1000000.0
         # Maximum replay length
         # Note: The Deepmind paper suggests 1000000 however this causes memory issues
-        max_memory_length = 100000
+        max_memory_length = 10000
         # Train the model after 6 actions
         update_after_actions = 6
         # How often to update the target network
@@ -95,14 +93,7 @@ class DataProcessor:
         loss_function = keras.losses.Huber()
 
         while True:  # Run until solved
-
-            received = self.get_event_step()
-
-            pixels = received
-            self.pipe_image(pixels)
-
-
-            state = np.array(env.reset())
+            state = np.array(self.get_state())
             episode_reward = 0
 
             for timestep in range(1, max_steps_per_episode):
@@ -128,32 +119,32 @@ class DataProcessor:
                 epsilon = max(epsilon, epsilon_min)
 
                 # Apply the sampled action in our environment
-                state_next, reward, done, info_dict = env.step(action)
+                state_next, reward, done, info_dict = self.get_event_step(action, state)
                 state_next = np.array(state_next)
 
                 episode_reward += reward
 
                 # Save actions and states in replay buffer
-                action_history.append(action)
-                state_history.append(state)
-                state_next_history.append(state_next)
-                done_history.append(done)
-                rewards_history.append(reward)
+                self.action_history.append(action)
+                self.state_history.append(state)
+                self.state_next_history.append(state_next)
+                self.done_history.append(done)
+                self.rewards_history.append(reward)
                 state = state_next
 
                 # Update every fourth frame and once batch size is over 32
-                if frame_count % update_after_actions == 0 and len(done_history) > batch_size:
+                if frame_count % update_after_actions == 0 and len(self.done_history) > batch_size:
 
                     # Get indices of samples for replay buffers
-                    indices = np.random.choice(range(len(done_history)), size=batch_size)
+                    indices = np.random.choice(range(len(self.done_history)), size=batch_size)
 
                     # Using list comprehension to sample from replay buffer
-                    state_sample = np.array([state_history[i] for i in indices])
-                    state_next_sample = np.array([state_next_history[i] for i in indices])
-                    rewards_sample = [rewards_history[i] for i in indices]
-                    action_sample = [action_history[i] for i in indices]
+                    state_sample = np.array([self.state_history[i] for i in indices])
+                    state_next_sample = np.array([self.state_next_history[i] for i in indices])
+                    rewards_sample = [self.rewards_history[i] for i in indices]
+                    action_sample = [self.action_history[i] for i in indices]
                     done_sample = tf.convert_to_tensor(
-                        [float(done_history[i]) for i in indices]
+                        [float(self.done_history[i]) for i in indices]
                     )
 
                     # Build the updated Q-values for the sampled future states
@@ -191,27 +182,35 @@ class DataProcessor:
                     print(template.format(running_reward, episode_count, frame_count))
 
                 # Limit the state and reward history
-                if len(rewards_history) > max_memory_length:
-                    del rewards_history[:1]
-                    del state_history[:1]
-                    del state_next_history[:1]
-                    del action_history[:1]
-                    del done_history[:1]
+                if len(self.rewards_history) > max_memory_length:
+                    del self.rewards_history[:1]
+                    del self.state_history[:1]
+                    del self.state_next_history[:1]
+                    del self.action_history[:1]
+                    del self.done_history[:1]
 
                 if done:
                     break
 
             # Update running reward to check condition for solving
-            episode_reward_history.append(episode_reward)
-            if len(episode_reward_history) > 100:
-                del episode_reward_history[:1]
-            running_reward = np.mean(episode_reward_history)
+            self.episode_reward_history.append(episode_reward)
+            if len(self.episode_reward_history) > 100:
+                del self.episode_reward_history[:1]
+            running_reward = np.mean(self.episode_reward_history)
 
             episode_count += 1
 
             if running_reward > 40:  # Condition to consider the task solved
                 print("Solved at episode {}!".format(episode_count))
                 break
+
+    def start_play_mode(self):
+        while True:
+            # Receive some data and process it a little
+            state = self.get_state()
+
+            # Send it back for HUD display
+            self.pipe_visual(state)
 
     def start(self):
         if self.data_mode == 'mss':
@@ -220,37 +219,36 @@ class DataProcessor:
         if self.game_mode == 'play':
             self.start_play_mode()
         elif self.game_mode == 'train':
-            self.start_train_mode()
+            self.run_q_model_test()
         else:
             self.start_play_mode()
-
-
-    def start_play_mode(self):
-        while True:
-            # Receive some data and process it a little
-            state = self.get_event_step()
-
-            # Send it back for HUD display
-            self.pipe_image(state[0])
-
-    def get_event_step(self):
-        if self.data_mode == 'mss':
-            return self.mss_event_step()
-        elif self.data_mode == 'pipe':
-            return self.pipe_event_step()
-        else:# default pipe
-            return self.pipe_event_step()
-
-    def start_train_mode(self):
-        dense = keras.layers.Dense(units=16)
-        inputs = keras.Input(shape=(GRAYSCALE_DIM, GRAYSCALE_DIM, 3))
         
-    def exit_procedure(self):  
-        self.write_conn.send(ExitSignalType())
-        # do some saving
-        return
+    def exit_procedure(self): 
+        '''
+        TODO: Save the Model if any.
+        Exit the program. 
+        ''' 
+
+        print('Data processing detected that pipe is closed/broken. Exiting...')
+        exit(0)
+
+    def pipe_action_visual(self, action, pixels):
+        ''' Send an action chosen by the model and a visual update on what is seen by the data processor. '''
+        try:
+            self.write_conn.send( (action, pixels) )
+        except BrokenPipeError:
+            self.exit_procedure()
+
+
+    def pipe_visual(self, pixels):
+        ''' Send a visual on what is seen by the data processor. '''
+        try:
+            self.write_conn.send(pixels)
+        except BrokenPipeError:
+            self.exit_procedure()
 
     def setup_mss(self):
+        ''' Setup a proper MSS class instance using config variables for display size'''
         self.sct = mss.mss()
         mon = self.sct.monitors[1]
         
@@ -262,40 +260,80 @@ class DataProcessor:
             "mon": 1,
         }
 
-    def mss_event_step(self):
-        received = self.read_conn.recv()
+    def get_state(self):
+        '''
+        Get a state from the game environment
+        Returns observations.
+        '''
 
-        # If exit signal received, perform handshake and return
-        if type(received) is ExitSignalType:
+        try:
+            received = self.read_conn.recv()
+        except EOFError:
             self.exit_procedure()
-            exit()
-            
+
+        if self.data_mode == 'pipe':
+            observations = self.process_piped_observations(received[0])
+        else: # mss
+            pixels = np.array(self.sct.grab(self.monitor)).astype('float32')
+            observations = self.process_captured_observations(pixels)
+
+        return observations
+
+
+    def get_event_step(self, actions, visual):
+        '''
+        Get a step from the game environment after applying actions
+        Returns (observations, reward, done, info).
+        '''
+        
+        if self.game_mode == 'train':
+            self.pipe_action_visual(actions, visual[0])
+        elif self.game_mode == 'play':
+            self.pipe_action_visual(actions, visual)
+        
+        try:
+            received = self.read_conn.recv()
+        except EOFError:
+            self.exit_procedure()
+
+        if self.data_mode == 'pipe':
+            observations = self.process_piped_observations(received[0])
+        else: # mss
+            pixels = np.array(self.sct.grab(self.monitor)).astype('float32')
+            observations = self.process_captured_observations(pixels)
+
+        return (observations, received[1], received[2], received[3])
+
+    def process_piped_observations(self, pixels):
+        '''
+        Process a piped pygame surfarray array3d.
+        Converts to 32-bit grayscale and resizes based on config variables.
+        '''
+
+        if self.game_mode == 'train':
+            new_frames = []
+            for frame in pixels:
+                if type(frame) is np.ndarray:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                    frame = cv2.resize(frame, (GRAYSCALE_DIM, GRAYSCALE_DIM))
+                new_frames.append(frame)
+            new_frames = np.array(new_frames)
+            return new_frames
+
+        elif self.game_mode == 'play':
+            pixels = np.array(pixels).astype('float32')
+            pixels = cv2.cvtColor(pixels, cv2.COLOR_RGB2GRAY)
+            pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))
+            return pixels
+
+    def process_captured_observations(self, pixels):
+        '''
+        Process an mss sct screen grab. Converts to 32-bit grayscale
+        and resizez based on config variables.
+        '''
+
         pixels = np.array(self.sct.grab(self.monitor)).astype('float32')
         pixels = cv2.cvtColor(pixels, cv2.COLOR_RGBA2GRAY)
-        pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))# / 255
-        #pixels = np.transpose(pixels.astype('float64'), (1,0,2))
+        pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))
         pixels = np.transpose(pixels, (1,0))
-
-        # Observation, reward, done, info
-        state = (pixels, received[1], received[2], None)
-        return state
-            
-
-    def pipe_image(self, pixels):
-        self.write_conn.send(pixels)
-
-    def pipe_event_step(self):
-        received = self.read_conn.recv()
-
-        # If exit signal received, perform handshake and return
-        if type(received) is ExitSignalType:
-            self.exit_procedure()
-            exit()
-        
-        pixels = received[0]
-        pixels = np.array(pixels).astype('float32')
-        pixels = cv2.cvtColor(pixels, cv2.COLOR_RGB2GRAY)
-        pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))# / 255
-        
-        state = (pixels, received[1], received[2], None)
-        return state
+        return pixels

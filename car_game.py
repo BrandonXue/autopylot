@@ -1,11 +1,13 @@
+from tensorflow.python.ops.gen_control_flow_ops import switch
 from config import *
 from defs import *
 from car_details_menu import *
 from rectangle import *
 
 import pygame
+import numpy as np
 
-from math import sqrt, radians, sin, cos
+from math import sqrt, radians, sin, cos, fabs
 from random import randint
     
 def clamp(value, min, max):
@@ -16,9 +18,10 @@ def clamp(value, min, max):
     return value
 
 class CarGame:
-    def __init__(self, read_conn, write_conn, game_mode, data_mode):
+    def __init__(self, read_conn, write_conn, game_mode, data_mode, no_flip):
         self.data_mode = data_mode
         self.game_mode = game_mode
+        self.no_flip = no_flip
 
         # We may want to init() selective modules (to look into if we have time)
         pygame.init()
@@ -31,6 +34,7 @@ class CarGame:
         self.world_bounds = Rectangle(-MAX_X_LOC_BOX, -MAX_Y_LOC_BOX, MAP_WIDTH, MAP_HEIGHT, RGB_WHITE)
         self.points = 0
         self.reward = 0 # for reinforcement learning
+        self.turbulence = 1
 
         # Keyboard related
         self.key_list = [False] * KEY_ARRAY_SIZE # Lists are faster for simple random access
@@ -47,11 +51,6 @@ class CarGame:
         self.font = pygame.freetype.Font(None, 32)
         self.car_details_menu = CarDetailsMenu((300, 500), (5, 5), (150, 150, 150, 200))
     
-        # Initial car state
-        self.rotation = 0.0
-        self.angular_velocity = 0.0 # Can think of this as steering wheel position
-        self.velocity = 0.0
-        self.collision = False
 
         # Pre-calculated game constants 
         self.half_viewport = pygame.math.Vector2(VIEWPORT_SIZE)/2
@@ -64,12 +63,16 @@ class CarGame:
             + 20 # Arbitrary number to ensure we don't filter out anything that looks like it should be colliding
         )
 
-        # Frame counter for throttling certain events
-        # self.frame_count = 0
+        # Frame counter modulus for throttling certain events
+        self.num_frames_per_batch = 4
         
     def reset_map(self):
-        # self.rects = self.rects[:(self.points - NUMBER_OF_DOTS)]
+        self.state_buffer = [] 
+        for iteration in range(4):
+            self.add_frame_to_buffer()
+        self.frame_count = 0
         self.points = 0
+        self.reward = 0
         self.rotation = 0.0
         self.angular_velocity = 0.0 # Can think of this as steering wheel position
         self.velocity = 0.0
@@ -80,18 +83,13 @@ class CarGame:
         )
         self.add_goal_rects_from_pool()
         
-    def draw_keras_view(self, pixels):
-        # self.cover_display.fill(RGB_WHITE)
-        pygame.surfarray.blit_array(self.cover_display, pixels)
-        
     def load_map_from_file(self, filepath):
-        in_file = open(filepath) #default read only
-        
-        i = 0
+        in_file = open(filepath) # default read only
         
         self.rects = []
         self.reward_dot_pool = []
-        
+
+        i = 0
         for line in in_file.readlines():
             j = 0
             for object_code in line:
@@ -114,7 +112,6 @@ class CarGame:
                 j = j+1
             i = i+1
         in_file.close()
-        self.add_goal_rects_from_pool()
     
     ##USE ONLY FOR RANDOM MAPS
     # def create_bounds(self):
@@ -198,25 +195,36 @@ class CarGame:
         self.goal_rects.remove(goal_rect)
     
     def store_input_keys(self):
-        for event in pygame.event.get():
-            # Treat quit event as escape button pressed
-            if event.type == pygame.QUIT:
-                self.key_list[pygame.K_ESCAPE] = True
-            
-            #MENU FUNCTIONS
-            if event.type == pygame.MOUSEMOTION:
-                self.car_details_menu.set_mouse_pos(pygame.mouse.get_pos())
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                self.car_details_menu.set_state(PRESS)
-            if event.type == pygame.MOUSEBUTTONUP:
-                self.car_details_menu.set_state(RELEASE)
-                self.car_details_menu.set_state(CLICK)
-            
-            #VEHICLE FUNCTIONS
-            elif event.type == pygame.KEYDOWN and event.key < KEY_ARRAY_SIZE:
-                self.key_list[event.key] = True
-            elif event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
-                self.key_list[event.key] = False
+        ''' Stores keyboard events in self.key_list '''
+        # In train mode only listen for exit triggers
+        if self.game_mode == 'train':
+            for event in pygame.event.get():
+                if ((event.type == pygame.QUIT) 
+                    or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)):
+                        self.key_list[pygame.K_ESCAPE] = True
+                        return 
+
+        # In play mode listen for all input keys within KEY_ARRAY_SIZE
+        elif self.game_mode == 'play':
+            for event in pygame.event.get():
+                # Treat quit event as escape button pressed
+                if event.type == pygame.QUIT:
+                    self.key_list[pygame.K_ESCAPE] = True
+                
+                #MENU FUNCTIONS
+                if event.type == pygame.MOUSEMOTION:
+                    self.car_details_menu.set_mouse_pos(pygame.mouse.get_pos())
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    self.car_details_menu.set_state(PRESS)
+                if event.type == pygame.MOUSEBUTTONUP:
+                    self.car_details_menu.set_state(RELEASE)
+                    self.car_details_menu.set_state(CLICK)
+                
+                #VEHICLE FUNCTIONS
+                elif event.type == pygame.KEYDOWN and event.key < KEY_ARRAY_SIZE:
+                    self.key_list[event.key] = True
+                elif event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
+                    self.key_list[event.key] = False
 
     def update_positions(self):
         pressed = False
@@ -286,22 +294,6 @@ class CarGame:
 
         self.collision = False
         
-        #for obj in self.bounds:
-        #
-        #    obj_center = obj.get_center()
-        #    max_viewable_dist = self.display_diag + obj.get_max_dim()
-        #
-        #    dist_between = player_center.distance_to(obj_center)
-        #    if (dist_between < max_viewable_dist):
-        #
-        #        object_coords = obj.pivot_and_offset(rear_axle, self.rotation, self.display_offset)
-        #        
-        #        if (not self.collision and dist_between < self.collision_check_dist):
-        #            if check_collision(player_coords, object_coords):
-        #                self.collision = True
-        #        
-        #        obj.draw(self.display, object_coords)
-        
         self.handle_rect_list(self.rects, player_center, player_coords, rear_axle)
         self.handle_rect_list(self.goal_rects, player_center, player_coords, rear_axle)
 
@@ -322,21 +314,76 @@ class CarGame:
                             self.collision = True
                             if obj.get_type() == GOAL:
                                 #big reward
-                                self.reward = 1000
+                                self.reached_goal = True
                                 obj.set_is_alive(False)
                                 #self.update_goal_rect()
                             else:
-                                self.rewards = -1000
+                                self.reward = -1
                                 self.mark_reset = True
                                 #big penalty
                             return # Early exit on collide
                     
                     obj.draw(self.display, object_coords)
 
+    def interpret_actions(self, actions):
+        ''' Interprets an action list as [W, A, S, D] '''
+        if actions == 0: # Accelerate forward
+            self.key_list[pygame.K_w] = True
+            self.key_list[pygame.K_a] = False
+            self.key_list[pygame.K_s] = False
+            self.key_list[pygame.K_d] = False
+
+        elif actions == 1: # Left cruise
+            self.key_list[pygame.K_w] = False
+            self.key_list[pygame.K_a] = True
+            self.key_list[pygame.K_s] = False
+            self.key_list[pygame.K_d] = False
+
+        elif actions == 2: # Accelerate backward
+            self.key_list[pygame.K_w] = False
+            self.key_list[pygame.K_a] = False
+            self.key_list[pygame.K_s] = True
+            self.key_list[pygame.K_d] = False
+
+        elif actions == 3: # Right cruise
+            self.key_list[pygame.K_w] = False
+            self.key_list[pygame.K_a] = False
+            self.key_list[pygame.K_s] = False
+            self.key_list[pygame.K_d] = True
+
+        elif actions == 4: # Left forward
+            self.key_list[pygame.K_w] = True
+            self.key_list[pygame.K_a] = True
+            self.key_list[pygame.K_s] = False
+            self.key_list[pygame.K_d] = False
+
+        elif actions == 5: # Right forward
+            self.key_list[pygame.K_w] = True
+            self.key_list[pygame.K_a] = False
+            self.key_list[pygame.K_s] = False
+            self.key_list[pygame.K_d] = True
+
+        elif actions == 6: # Left backward
+            self.key_list[pygame.K_w] = False
+            self.key_list[pygame.K_a] = True
+            self.key_list[pygame.K_s] = True
+            self.key_list[pygame.K_d] = False
+
+        elif actions == 7: # Right backward
+            self.key_list[pygame.K_w] = False
+            self.key_list[pygame.K_a] = False
+            self.key_list[pygame.K_s] = True
+            self.key_list[pygame.K_d] = True
+
+    def draw_observation(self, pixels):
+        # self.cover_display.fill(RGB_WHITE)
+        pygame.surfarray.blit_array(self.cover_display, pixels)
+
     def draw_dashboard(self):
-            
         if not self.cover_display.get_locked() and not self.display.get_locked():
-            self.display.blit(self.cover_display, (VIEWPORT_WIDTH-180, VIEWPORT_HEIGHT-180))
+            cover_display_area = self.display.blit(
+                self.cover_display, (VIEWPORT_WIDTH-180, VIEWPORT_HEIGHT-180)
+            )
         
         # temp_menu.draw(viewport)
         reward_text = f"Reward: {self.reward}"
@@ -346,7 +393,64 @@ class CarGame:
         # self.font.render_to(self.display, (5, 35), point_text, RGBA_LIGHT_RED)
         self.font.render_to(self.display, (5, VIEWPORT_HEIGHT-35), fps_text, RGBA_LIGHT_RED)
 
-    
+        if cover_display_area:
+            return cover_display_area
+
+    def add_frame_to_buffer(self):
+        frame = np.array(pygame.surfarray.array3d(self.display), dtype='float32')
+        self.state_buffer.insert(0, frame)
+        if len(self.state_buffer) > self.num_frames_per_batch:
+            self.state_buffer.pop()
+
+    def pipe_buffer(self):
+        observation = self.state_buffer
+        self.write_conn.send( (observation, self.reward, self.collision, None) )
+
+    def pipe_state(self):
+        if self.data_mode == 'pipe':
+            observation = pygame.surfarray.array3d(self.display)
+            self.write_conn.send( (observation, self.reward, self.collision, None) )
+
+        elif self.data_mode == 'mss':
+            observation = None
+            self.write_conn.send( (observation, self.reward, self.collision, None) )
+
+    def calc_reward(self):
+        ''' Ideas: 
+        Punish indecisiveness (flip-flopping inputs)
+        Punish idleness (low velocity for extended durations of time)
+        Heavily punish crashing (when collision == True)
+        Reward exploration (reward cumulative velocity magnitude)
+        '''
+
+        # if self.turbulence * self.velocity < 0: # Different sign
+        #     # increase magnitude and flip sign
+        #     self.turbulence *= (self.velocity + (1 if self.velocity > 0 else -1))
+           
+        #    # keep track of sign
+        #     positive = self.turbulence > 0
+
+        #     # If magnitude > 100, reset magnitude to 100 while preserving the same sign
+        #     if fabs(self.turbulence) > 100:
+        #         self.turbulence = 100 if positive else -100
+
+
+        # else: # Same sign
+        #     # keep track of sign
+        #     positive = self.turbulence > 0
+        #     # decrease magnitude
+        #     self.turbulence *= 0.5
+
+        #     # If we lowered below magnitude 1, reset magnitude to 1 while preserving the same sign
+        #     if fabs(self.turbulence) < 1:
+        #         self.turbulence = 1 if positive else -1
+
+        if self.mark_reset:
+            self.reward = -100
+        elif self.reached_goal:
+            self.reward = 100
+        else:
+            self.reward = 10 * fabs(self.velocity)
 
     def start(self):
         #self.create_bounds()
@@ -354,13 +458,12 @@ class CarGame:
         #self.create_random_rects()
         
         self.load_map_from_file("GameMap_1.txt")
+        self.reset_map()
         
         self.clock = pygame.time.Clock()
-        
         while True:
             # Mange framerate
             self.clock.tick(FRAME_RATE)
-            #self.clock.tick_busy_loop(FRAME_RATE) #This version will use more CPU
             self.fps = self.clock.get_fps()
 
             # Get input events
@@ -368,48 +471,47 @@ class CarGame:
 
             # If escape is pressed, break main event loop
             if self.key_list[pygame.K_ESCAPE]:
-                # Send exit signal and wait for handshake 
-                self.write_conn.send(ExitSignalType())
-                while not type(self.read_conn.recv()) == ExitSignalType: pass
-                return True
+                exit(0)
 
             # Fill background color
             self.display.fill(RGB_WHITE)
 
-            self.mark_reset = False # If crashed during this step, draw_game_scene will set this to True
-            # Draw player, rectangles, etc.
-            self.draw_game_scene()
+            self.mark_reset = False # If crashes during this step, draw_game_scene will set this to True
+            self.reached_goal = False # If reaches goal during this step, ...
 
-            # Update player position
-            self.update_positions()
+            self.draw_game_scene() # Draw player,other rectangles, etc
 
-            # Send information
-            if self.data_mode == 'pipe':
-                observation = pygame.surfarray.array3d(self.display)
-                reward = self.reward
-                done = self.collision
-                info = None
-                self.write_conn.send( (observation, reward, done, info) )
+            # Receive update from data processor
+            if self.game_mode == 'train':
+                self.add_frame_to_buffer()
+                if self.frame_count == 0:
+                    self.pipe_buffer() # Send information from the environment to data processor
 
-            elif self.data_mode == 'mss':
-                observation = None
-                reward = self.reward
-                done = self.collision
-                info = None
-                self.write_conn.send( (observation, reward, done, info) )
+                    reply = self.read_conn.recv()
+                    self.interpret_actions(reply[0])
+                    self.draw_observation(reply[1])
 
-            # See if there are any updates from data processor
-            if self.read_conn.poll():
-                reply = self.read_conn.recv()
-                self.draw_keras_view(reply)
+            elif self.game_mode == 'play':
+                self.pipe_state()
+                if self.read_conn.poll(): # Not training, may skip
+                    reply = self.read_conn.recv()
+                    self.draw_observation(reply)
 
-            self.draw_dashboard()
+            self.update_positions() # Update movable object positions
+
+            cover_display_area = self.draw_dashboard()
 
             # Reward staying alive
-            self.reward += 1
+            self.calc_reward()
 
             # Swap buffers
-            pygame.display.flip()
+            if self.no_flip:
+                if cover_display_area:
+                    pygame.display.update(cover_display_area)
+            else:
+                pygame.display.flip()
+
+            self.frame_count = (self.frame_count + 1) % self.num_frames_per_batch
 
             if self.mark_reset == True:
                 self.reset_map()

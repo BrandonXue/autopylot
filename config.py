@@ -1,6 +1,6 @@
 # ============== USER AND REMINDER ===============
-#CURRENT_USER = 'Brandon Xue'
-CURRENT_USER = 'Jacob Rapmund'
+CURRENT_USER = 'Brandon Xue'
+# CURRENT_USER = 'Jacob Rapmund'
 print('\nConfig loaded for', CURRENT_USER, end='\n\n') # Remind on load
 
 # =================== VIEWPORT ===================
@@ -73,7 +73,7 @@ CAR_HEIGHT = {
 CAR_SIZE = (CAR_WIDTH, CAR_HEIGHT)
 
 CAR_ACCELERATION = {
-    'Brandon Xue': 0.005,
+    'Brandon Xue': 0.05,
     'Jacob Rapmund': 0.05 #0.002
 }[CURRENT_USER]
 
@@ -88,12 +88,12 @@ CAR_VELOCITY_ZERO_THRESHOLD = {
 }[CURRENT_USER]
 
 CAR_VELOCITY_DECAY = {
-    'Brandon Xue': 0.99,
+    'Brandon Xue': 1.0,
     'Jacob Rapmund': 0.95 #0.993
 }[CURRENT_USER]
 
 CAR_ANGULAR_ACCELERATION = {
-    'Brandon Xue': 0.002,
+    'Brandon Xue': 0.006,
     'Jacob Rapmund': 0.004 #0.001
 }[CURRENT_USER]
 
