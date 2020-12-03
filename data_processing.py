@@ -21,9 +21,9 @@ class DataProcessor:
         self.write_conn = write_conn
 
     def create_q_model(self):
-        self.num_actions = 8
+        self.num_actions = 6
         # Network defined by the Deepmind paper
-        inputs = layers.Input(shape=(4, 80, 80, 1))
+        inputs = layers.Input(shape=(4, 80, 80, 3))
 
         # Convolutions on the frames on the screen
         layer1 = layers.Conv2D(32, 8, strides=4, activation="relu")(inputs)
@@ -44,7 +44,7 @@ class DataProcessor:
         screen capture."""
 
         # Configuration for Keras setup
-        # seed = 481             # For somewhat repeatable outcomes
+        SOLVE_THRESHOLD = 1000
         gamma = 0.99           # Discount factor for past rewards
         epsilon = 1.0          # Epsilon greedy parameter
         epsilon_min = 0.1      # Minimum for epsilon greedy parameter
@@ -79,12 +79,12 @@ class DataProcessor:
         episode_count = 0
         frame_count = 0
         # Number of frames to take random action and observe output
-        epsilon_random_frames = 50000
+        epsilon_random_frames = 500 # 50000 
         # Number of frames for exploration
-        epsilon_greedy_frames = 1000000.0
+        epsilon_greedy_frames = 1000.0 # 1000000.0
         # Maximum replay length
         # Note: The Deepmind paper suggests 1000000 however this causes memory issues
-        max_memory_length = 10000
+        max_memory_length = 5000 # 10000
         # Train the model after 6 actions
         update_after_actions = 6
         # How often to update the target network
@@ -119,7 +119,8 @@ class DataProcessor:
                 epsilon = max(epsilon, epsilon_min)
 
                 # Apply the sampled action in our environment
-                state_next, reward, done, info_dict = self.get_event_step(action, state)
+                info = (running_reward, frame_count)
+                state_next, reward, done, info_dict = self.get_event_step(action, state, info)
                 state_next = np.array(state_next)
 
                 episode_reward += reward
@@ -200,7 +201,7 @@ class DataProcessor:
 
             episode_count += 1
 
-            if running_reward > 40:  # Condition to consider the task solved
+            if running_reward > SOLVE_THRESHOLD:  # Condition to consider the task solved
                 print("Solved at episode {}!".format(episode_count))
                 break
 
@@ -232,10 +233,10 @@ class DataProcessor:
         print('Data processing detected that pipe is closed/broken. Exiting...')
         exit(0)
 
-    def pipe_action_visual(self, action, pixels):
+    def pipe_action_visual(self, action, pixels, info=None):
         ''' Send an action chosen by the model and a visual update on what is seen by the data processor. '''
         try:
-            self.write_conn.send( (action, pixels) )
+            self.write_conn.send( (action, pixels, info) )
         except BrokenPipeError:
             self.exit_procedure()
 
@@ -280,16 +281,16 @@ class DataProcessor:
         return observations
 
 
-    def get_event_step(self, actions, visual):
+    def get_event_step(self, actions, visual, info):
         '''
         Get a step from the game environment after applying actions
         Returns (observations, reward, done, info).
         '''
         
         if self.game_mode == 'train':
-            self.pipe_action_visual(actions, visual[0])
+            self.pipe_action_visual(actions, visual[0], info)
         elif self.game_mode == 'play':
-            self.pipe_action_visual(actions, visual)
+            self.pipe_action_visual(actions, visual, None)
         
         try:
             received = self.read_conn.recv()
@@ -314,7 +315,7 @@ class DataProcessor:
             new_frames = []
             for frame in pixels:
                 if type(frame) is np.ndarray:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                    # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
                     frame = cv2.resize(frame, (GRAYSCALE_DIM, GRAYSCALE_DIM))
                 new_frames.append(frame)
             new_frames = np.array(new_frames)
@@ -322,7 +323,7 @@ class DataProcessor:
 
         elif self.game_mode == 'play':
             pixels = np.array(pixels).astype('float32')
-            pixels = cv2.cvtColor(pixels, cv2.COLOR_RGB2GRAY)
+            # pixels = cv2.cvtColor(pixels, cv2.COLOR_RGB2GRAY)
             pixels = cv2.resize(pixels, (GRAYSCALE_DIM, GRAYSCALE_DIM))
             return pixels
 

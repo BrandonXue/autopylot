@@ -5,12 +5,12 @@ print('\nConfig loaded for', CURRENT_USER, end='\n\n') # Remind on load
 
 # =================== VIEWPORT ===================
 VIEWPORT_WIDTH = {
-    'Brandon Xue': 1080,
+    'Brandon Xue': 1080, # 1080
     'Jacob Rapmund': 1080
 }[CURRENT_USER]
 
 VIEWPORT_HEIGHT = {
-    'Brandon Xue': 720,
+    'Brandon Xue': 720, # 720
     'Jacob Rapmund': 720
 }[CURRENT_USER]
 
@@ -88,17 +88,17 @@ CAR_VELOCITY_ZERO_THRESHOLD = {
 }[CURRENT_USER]
 
 CAR_VELOCITY_DECAY = {
-    'Brandon Xue': 1.00, # .99
+    'Brandon Xue': 0.95, # .99
     'Jacob Rapmund': 0.95 #0.993
 }[CURRENT_USER]
 
 CAR_ANGULAR_ACCELERATION = {
-    'Brandon Xue': 0.006,
+    'Brandon Xue': 0.01,
     'Jacob Rapmund': 0.004 #0.001
 }[CURRENT_USER]
 
 CAR_MAX_ANGULAR_VELOCITY = {
-    'Brandon Xue': 0.4,
+    'Brandon Xue': 0.5, # 0.4
     'Jacob Rapmund': 0.4 #0.4
 }[CURRENT_USER]
 
@@ -108,7 +108,7 @@ CAR_ANGULAR_ZERO_THRESHOLD = {
 }[CURRENT_USER]
 
 CAR_ANGULAR_VELOCITY_DECAY = {
-    'Brandon Xue': 0.985,
+    'Brandon Xue': 0.95,
     'Jacob Rapmund': 0.95 #0.990
 }[CURRENT_USER]
 
@@ -119,7 +119,7 @@ KEY_ARRAY_SIZE = {
 }[CURRENT_USER]
 
 FRAME_RATE = {
-    'Brandon Xue': 120,
+    'Brandon Xue': 60,
     'Jacob Rapmund': 120
 }[CURRENT_USER]
 

@@ -48,7 +48,7 @@ class CarGame:
 
         self.cover_display = pygame.Surface((GRAYSCALE_DIM, GRAYSCALE_DIM))
 
-        self.font = pygame.freetype.Font(None, 32)
+        self.font = pygame.freetype.Font(None, 14)
         self.car_details_menu = CarDetailsMenu((300, 500), (5, 5), (150, 150, 150, 200))
     
 
@@ -70,12 +70,17 @@ class CarGame:
         self.state_buffer = [] 
         for iteration in range(4):
             self.add_frame_to_buffer()
+
+        self.running_reward = 0 # running reward of model
+        self.learning_fc = 0 # model frame count
+
         self.frame_count = 0
         self.points = 0
         self.reward = 0
         self.rotation = 0.0
         self.angular_velocity = 0.0 # Can think of this as steering wheel position
         self.velocity = 0.0
+
         self.player_rect = PlayerRectangle(
             self.player_start_pos[0]*MAX_BOX_WIDTH + MAX_BOX_WIDTH/2, 
             self.player_start_pos[1]*MAX_BOX_HEIGHT + MAX_BOX_HEIGHT/2, 
@@ -327,52 +332,40 @@ class CarGame:
 
     def interpret_actions(self, actions):
         ''' Interprets an action list as [W, A, S, D] '''
-        if actions == 0: # Accelerate forward
+        if actions == 0: # forward
             self.key_list[pygame.K_w] = True
             self.key_list[pygame.K_a] = False
             self.key_list[pygame.K_s] = False
             self.key_list[pygame.K_d] = False
 
-        elif actions == 1: # Left cruise
-            self.key_list[pygame.K_w] = False
+        elif actions == 1: # Left forward
+            self.key_list[pygame.K_w] = True
             self.key_list[pygame.K_a] = True
             self.key_list[pygame.K_s] = False
             self.key_list[pygame.K_d] = False
 
-        elif actions == 2: # Accelerate backward
+        elif actions == 2: # backward
             self.key_list[pygame.K_w] = False
             self.key_list[pygame.K_a] = False
             self.key_list[pygame.K_s] = True
             self.key_list[pygame.K_d] = False
 
-        elif actions == 3: # Right cruise
-            self.key_list[pygame.K_w] = False
-            self.key_list[pygame.K_a] = False
-            self.key_list[pygame.K_s] = False
-            self.key_list[pygame.K_d] = True
-
-        elif actions == 4: # Left forward
-            self.key_list[pygame.K_w] = True
-            self.key_list[pygame.K_a] = True
-            self.key_list[pygame.K_s] = False
-            self.key_list[pygame.K_d] = False
-
-        elif actions == 5: # Right forward
+        elif actions == 3: # Right forward
             self.key_list[pygame.K_w] = True
             self.key_list[pygame.K_a] = False
             self.key_list[pygame.K_s] = False
             self.key_list[pygame.K_d] = True
 
-        elif actions == 6: # Left backward
+        elif actions == 4: # Left
             self.key_list[pygame.K_w] = False
             self.key_list[pygame.K_a] = True
-            self.key_list[pygame.K_s] = True
+            self.key_list[pygame.K_s] = False
             self.key_list[pygame.K_d] = False
 
-        elif actions == 7: # Right backward
+        elif actions == 5: # Right
             self.key_list[pygame.K_w] = False
             self.key_list[pygame.K_a] = False
-            self.key_list[pygame.K_s] = True
+            self.key_list[pygame.K_s] = False
             self.key_list[pygame.K_d] = True
 
     def draw_observation(self, pixels):
@@ -382,38 +375,53 @@ class CarGame:
     def draw_dashboard(self):
         if not self.cover_display.get_locked() and not self.display.get_locked():
             cover_display_area = self.display.blit(
-                self.cover_display, (VIEWPORT_WIDTH-180, VIEWPORT_HEIGHT-180)
+                self.cover_display, (VIEWPORT_WIDTH-GRAYSCALE_DIM-8, VIEWPORT_HEIGHT-GRAYSCALE_DIM-8)
             )
         
         # temp_menu.draw(viewport)
-        reward_text = f"Reward: {self.reward}"
-        # point_text = f"Points: {self.points}"
-        fps_text = "FPS: {:.2f}".format(self.fps)
-        self.font.render_to(self.display, (5, 5), reward_text, RGBA_LIGHT_RED)
-        # self.font.render_to(self.display, (5, 35), point_text, RGBA_LIGHT_RED)
-        self.font.render_to(self.display, (5, VIEWPORT_HEIGHT-35), fps_text, RGBA_LIGHT_RED)
+        reward_text = f"Reward: {self.reward:.3f}    Running Reward: {self.running_reward:.3f}"
+        frame_count_text = f"Frame Count: {self.learning_fc:.3f}"
+        fps_text = f"FPS: {self.fps:.2f}"
+        self.font.render_to(self.display, (4, 4), reward_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (4, 32), frame_count_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (4, VIEWPORT_HEIGHT-32), fps_text, RGBA_LIGHT_RED)
 
         if cover_display_area:
             return cover_display_area
 
+    def set_dashboard_info(self, info):
+        if info:
+            self.running_reward = info[0] # running reward
+            self.learning_fc = info[1] # frame count
+
     def add_frame_to_buffer(self):
         frame = np.array(pygame.surfarray.array3d(self.display), dtype='float32')
-        self.state_buffer.insert(0, frame)
+        self.state_buffer.append(frame)
         if len(self.state_buffer) > self.num_frames_per_batch:
-            self.state_buffer.pop()
+            del self.state_buffer[:1]
+            # self.state_buffer.pop()
 
     def pipe_buffer(self):
         observation = self.state_buffer
-        self.write_conn.send( (observation, self.reward, self.collision, None) )
+        try:
+            self.write_conn.send( (observation, self.reward, self.collision, None) )
+        except BrokenPipeError: # the other process closed pipe
+            exit()
 
     def pipe_state(self):
         if self.data_mode == 'pipe':
             observation = pygame.surfarray.array3d(self.display)
-            self.write_conn.send( (observation, self.reward, self.collision, None) )
+            try:
+                self.write_conn.send( (observation, self.reward, self.collision, None) )
+            except BrokenPipeError: # the other process closed pipe
+                exit()
 
         elif self.data_mode == 'mss':
             observation = None
-            self.write_conn.send( (observation, self.reward, self.collision, None) )
+            try:
+                self.write_conn.send( (observation, self.reward, self.collision, None) )
+            except BrokenPipeError: # the other process closed pipe
+                exit()
 
     def calc_reward(self):
         ''' Ideas: 
@@ -450,7 +458,7 @@ class CarGame:
         elif self.reached_goal:
             self.reward = 1
         else:
-            self.reward = 0.2 * fabs(self.velocity)
+            self.reward = (fabs(self.velocity) - 0.5 * CAR_MAX_VELOCITY) / CAR_MAX_VELOCITY
 
     def start(self):
         #self.create_bounds()
@@ -489,10 +497,11 @@ class CarGame:
                     try:
                         reply = self.read_conn.recv()
                     except EOFError:
-                        self.reset_map()
-                        continue
+                        exit()
+
                     self.interpret_actions(reply[0])
                     self.draw_observation(reply[1])
+                    self.set_dashboard_info(reply[2])
 
             elif self.game_mode == 'play':
                 self.pipe_state()
