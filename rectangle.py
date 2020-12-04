@@ -46,25 +46,41 @@ class Rectangle:
         
     def draw(self, surface, coordinates):
         polygon(surface, self.color_, coordinates)
-        
+
 class EnvironmentRectangle(Rectangle):
-    def __init__(self, x=0, y=0, width=10, height=10, color=RGB_GREEN, type=OBSTACLE):
+    def __init__(self, x=0, y=0, width=10, height=10, color=RGB_GREEN):
         super().__init__(x, y, width, height, color)
-        self.type_ = type
         self.is_alive = True
-        
-    def get_type(self):
-        return self.type_
-        
+
     def set_is_alive(self, is_alive):
         self.is_alive = is_alive
         
     def get_is_alive(self):
         return self.is_alive
 
+class GoalRectangle(EnvironmentRectangle):
+    def __init__(self, x=0, y=0, width=40, height=40, color=RGB_GOLD, donut_color=RGB_WHITE):
+        super().__init__(x, y, width, height, color)
+        self.is_alive = True
+
+        donut_width = width * 0.5
+        donut_offset_x = (donut_width) / 2
+        donut_height = height * 0.5
+        donut_offset_y = (donut_height) / 2
+        self.donut = Rectangle(
+            x + donut_offset_x, y + donut_offset_y,
+            donut_width, donut_height, donut_color
+        )
+
+    def pivot_and_offset_donut(self, pivot_point, degrees, view_adjust):
+        return self.donut.pivot_and_offset(pivot_point, degrees, view_adjust)
+
+    def draw_donut(self, surface, coordinates):
+        polygon(surface, self.donut.color_, coordinates)
+
 class PlayerRectangle(Rectangle):
     def __init__(self, x=0, y=0, width=10, height=10):
-        super().__init__(x, y, width, height, RGB_BLUE) 
+        super().__init__(x, y, width, height, RGB_BLUE)
 
         # Set position and state
         # We want a position near the rear because cars pivot around rear axle
