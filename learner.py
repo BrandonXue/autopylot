@@ -1,6 +1,12 @@
+# Type checking
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from car_game import CarGame
+
+# Local modules
 from config import *
 
-import cv2
+# Other modules
 import numpy as np
 import pickle
 
@@ -9,16 +15,17 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import load_model
 
-class Learner:
-    def __init__(self, model_name: str, target_model_name: str, experience_replay_name: str):
+class DQN:
+    def __init__(self, model_name: str, target_model_name: str, experience_replay_name: str, do_save: bool):
         self.model_name = model_name
         self.target_model_name = target_model_name
         self.experience_replay_name = experience_replay_name
+        self.do_save = do_save
 
-    def set_game(self, car_game):
-        self.car_game = car_game
+    def set_game(self, car_game_: 'CarGame') -> None:
+        self.car_game = car_game_
 
-    def create_q_model(self):
+    def create_q_model(self) -> keras.Model:
         # Network defined by the Deepmind paper
         inputs = layers.Input(shape=(4, 80, 80, 1))
 
@@ -26,16 +33,17 @@ class Learner:
         layer1 = layers.Conv2D(32, 3, strides=2, activation="relu")(inputs)
         layer2 = layers.Conv2D(64, 5, strides=3, activation="relu")(layer1)
         layer3 = layers.Flatten()(layer2)
-        layer4 = layers.Dense(512, activation="relu")(layer3)
-        action = layers.Dense(self.num_actions, activation="tanh")(layer4)
+        layer4 = layers.Dense(256, activation="relu")(layer3)
+        layer5 = layers.Dense(256, activation="relu")(layer4)
+        action = layers.Dense(self.num_actions, activation="tanh")(layer5)
 
         model = keras.Model(inputs=inputs, outputs=action)
         return model
 
 
-    def set_hyper_params(self):
+    def set_training_config(self) -> None:
         self.num_actions = 8
-        self.solve_threshold = 1000
+        self.solve_threshold = 4000
         self.gamma = 0.99           # Discount factor for past rewards
         self.epsilon = 1.0          # Epsilon greedy parameter
         self.epsilon_min = 0.1      # Minimum for epsilon greedy parameter
@@ -59,7 +67,7 @@ class Learner:
         # How often to update the target network
         self.update_target_network = 10000
 
-    def load_or_create_models(self):
+    def load_or_create_models(self) -> None:
         # The first model makes the predictions for Q-values which are used to
         # make a action.
         try:
@@ -82,7 +90,7 @@ class Learner:
         else:
             print('Target model loaded successfully.')
 
-    def load_or_create_buffers(self):
+    def load_or_create_buffers(self) -> None:
         # Experience replay buffers
         try:
             with open(self.experience_replay_name, 'rb') as filehandle:
@@ -103,14 +111,14 @@ class Learner:
         else:
             print('Experience replays loaded successfully')
 
-    def add_to_buffers(self, action, state, state_next, done, reward):
+    def add_to_buffers(self, action, state, state_next, done, reward) -> None:
         self.action_history.append(action)
         self.state_history.append(state)
         self.state_next_history.append(state_next)
         self.done_history.append(done)
         self.rewards_history.append(reward)
 
-    def trim_buffers(self):
+    def trim_buffers(self) -> None:
         del self.rewards_history[:1]
         del self.state_history[:1]
         del self.state_next_history[:1]
@@ -120,7 +128,7 @@ class Learner:
     # !!!!NOTE: Code from online: Keras Atari breakout example
     # https://keras.io/examples/rl/deep_q_network_breakout/
     # By authors: Jacob Chapman and Mathias Lechner
-    def run_q_model_test(self):
+    def run_q_model_test(self) -> None:
         """Run the training. If mode is 'pipe', video data will be collected by piping
         from the car_game process. If mode is 'mss', video data will be collected by
         screen capture."""
@@ -137,7 +145,7 @@ class Learner:
         self.loss_function = keras.losses.Huber()
 
         while True:  # Run until solved
-            self.car_game.reset_map()
+            self.car_game.reset()
             state = np.array(self.car_game.get_state())
             episode_reward = 0
 
@@ -223,7 +231,7 @@ class Learner:
 
                 # Limit the state and reward history
                 if len(self.rewards_history) > self.max_memory_length:
-                    self.trim_buffers(self)
+                    self.trim_buffers()
 
                 if done:
                     break
@@ -240,27 +248,37 @@ class Learner:
                 print("Solved at episode {}!".format(episode_count))
                 break
 
+        self.save_items()
+
         
-    def save_items(self): 
+    def save_items(self) -> None: 
         '''
+        If self.do_save is set to False, nothing happens.
         Save the Model and experience replay buffers, if any.
         Exit the program. 
         ''' 
-        try:
+
+        # Check flag, do not save if saving is disabled
+        if not self.do_save:
+            print('Saving disabled. No saves were made!')
+            return
+
+        print('\n')
+        try: # Save the model
             self.model.save(self.model_name)
         except:
             print('Model not saved.')
         else:
             print('Model saved successfully.')
-        try:
+
+        try: # Save the target model
             self.model_target.save(self.target_model_name)
         except:
             print('Target model not saved.')
         else:
             print('Target model saved successfully.')
 
-        # Experience replay buffers
-        try:
+        try: # Save experience replay buffers
             with open(self.experience_replay_name, 'wb') as filehandle:
                 pickle.dump(self.action_history, filehandle)
                 pickle.dump(self.state_history, filehandle)
@@ -272,3 +290,4 @@ class Learner:
             print('An error occured during saving of experience replay.')
         else:
             print('Experience replays saved successfully')
+        print()

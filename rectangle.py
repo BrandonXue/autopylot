@@ -1,6 +1,9 @@
+# Local modules
+from defs import *
+
+# Other modules
 from pygame.math import Vector2
 from pygame.draw import polygon
-from defs import *
 
 #Environment types
 OBSTACLE=0

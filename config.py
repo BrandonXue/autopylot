@@ -1,7 +1,7 @@
 # ============== USER AND REMINDER ===============
 CURRENT_USER = 'Brandon Xue'
 # CURRENT_USER = 'Jacob Rapmund'
-print('\nConfig loaded for', CURRENT_USER, end='\n\n') # Remind on load
+print('\nCar game config loaded for', CURRENT_USER, end='\n\n') # Remind on load
 
 # =================== VIEWPORT ===================
 VIEWPORT_WIDTH = {

@@ -1,5 +1,9 @@
+# Type checking
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from learner import DQN
+
 # Local modules
-from typing import List
 from config import *
 from defs import *
 from rectangle import *
@@ -14,7 +18,7 @@ import numpy as np
 from math import sqrt, radians, sin, cos, fabs
 from random import randint
     
-def clamp(value, min, max):
+def clamp(value: float, min: float, max: float) -> float:
     if value > max:
         value = max
     elif value < min:
@@ -43,7 +47,7 @@ class CarGame:
         # Display related
         self.display = pygame.display.set_mode(
             VIEWPORT_SIZE,
-            pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.FULLSCREEN
+            pygame.DOUBLEBUF | pygame.HWSURFACE #| pygame.FULLSCREEN
         )
         self.display.set_alpha(None)
 
@@ -65,10 +69,10 @@ class CarGame:
         # Frame counter modulus for throttling certain events
         self.num_frames_per_batch = 4
         
-    def set_learner(self, learner):
-        self.learner = learner
+    def set_learner(self, learner_: 'DQN') -> None:
+        self.learner = learner_
 
-    def reset_map(self):
+    def reset(self) -> None:
         self.mark_reset = False
         self.running_reward = 0 # running reward of model
         self.episode_count = 0
@@ -94,7 +98,7 @@ class CarGame:
             for iteration in range(4):
                 self.state_buffer.append(self.get_processed_frame())
         
-    def load_map_from_file(self, filepath):
+    def load_map_from_file(self, filepath: str) -> None:
         in_file = open(filepath) # default read only
         
         self.rects = []
@@ -124,7 +128,7 @@ class CarGame:
             i = i+1
         in_file.close()
 
-    def add_goal_rects_from_pool(self): #needs set alive function
+    def add_goal_rects_from_pool(self) -> None: #needs set alive function
         self.goal_rects = []
         temp_pool = self.reward_dot_pool.copy()
         for i in range(0, NUMBER_OF_DOTS):
@@ -138,7 +142,7 @@ class CarGame:
                 )
             )
 
-    def store_input_keys(self):
+    def store_input_keys(self) -> None:
         ''' Stores keyboard events in self.key_list and also stores QUIT as ESCAPE. '''
 
         # In play mode listen for all input keys within KEY_ARRAY_SIZE
@@ -152,7 +156,7 @@ class CarGame:
             elif event.type == pygame.KEYUP and event.key < KEY_ARRAY_SIZE:
                 self.key_list[event.key] = False
 
-    def store_exit_events(self):
+    def store_exit_events(self) -> None:
         ''' Only listens for events that quit the game and stores them as keys. '''
         
         for event in pygame.event.get():
@@ -161,7 +165,7 @@ class CarGame:
                     self.key_list[pygame.K_ESCAPE] = True
                     return
 
-    def update_positions(self):
+    def update_positions(self) -> None:
         pressed = False
 
         if self.key_list[pygame.K_w]:
@@ -212,7 +216,7 @@ class CarGame:
         self.player_rect.move( (sin(rads) * self.velocity, cos(rads) * self.velocity) )
 
 
-    def draw_game_scene(self):
+    def draw_game_scene(self) -> None:
         # These locations are used as references
         player_center = self.player_rect.get_center()
         rear_axle = self.player_rect.get_rear_center()
@@ -229,7 +233,7 @@ class CarGame:
         self.reached_goal = False # handle_rect_list may set to true
         self.handle_goal_list(self.goal_rects, player_center, player_coords, rear_axle)
 
-    def handle_goal_list(self, goal_list, player_center, player_coords, rear_axle):
+    def handle_goal_list(self, goal_list, player_center, player_coords, rear_axle) -> None:
         for obj in goal_list:
                 
             if obj.get_is_alive():
@@ -252,7 +256,7 @@ class CarGame:
                     obj.draw(self.display, object_coords)
                     obj.draw_donut(self.display, donut_coords)
 
-    def handle_rect_list(self, rect_list, player_center, player_coords, rear_axle):
+    def handle_rect_list(self, rect_list, player_center, player_coords, rear_axle) -> None:
         for obj in rect_list:
                 
             if obj.get_is_alive():
@@ -271,7 +275,7 @@ class CarGame:
                     
                     obj.draw(self.display, object_coords)
 
-    def interpret_actions(self, actions):
+    def interpret_actions(self, actions: int) -> None:
         ''' Interprets an action list as [W, A, S, D] '''
         if actions == 0: # forward
             self.key_list[pygame.K_w] = True
@@ -321,10 +325,10 @@ class CarGame:
             self.key_list[pygame.K_s] = False
             self.key_list[pygame.K_d] = True
 
-    def draw_observation(self, pixels):
+    def draw_observation(self, pixels) -> None:
         pygame.surfarray.blit_array(self.cover_display, pixels)
 
-    def draw_play_dashboard(self):
+    def draw_play_dashboard(self) -> None:
         points_text = f"Points: {self.points:.2f}"
         fps_text = f"FPS: {self.fps:.2f}"
         self.font.render_to(self.display, (4, 4), points_text, RGBA_LIGHT_RED)
@@ -341,9 +345,9 @@ class CarGame:
         reward_text = f"Reward: {self.reward:.2f},    Running Reward: {self.running_reward:.2f}"
         training_text = f"Episode Count: {self.episode_count:.2f},    Frame Count: {self.learning_fc:.2f}"
         fps_text = f"FPS: {self.fps:.2f}"
-        self.font.render_to(self.display, (4, 4), reward_text, RGBA_LIGHT_RED)
-        self.font.render_to(self.display, (4, 32), training_text, RGBA_LIGHT_RED)
-        self.font.render_to(self.display, (4, VIEWPORT_HEIGHT-32), fps_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (4, VIEWPORT_HEIGHT-60), reward_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (4, VIEWPORT_HEIGHT-44), training_text, RGBA_LIGHT_RED)
+        self.font.render_to(self.display, (4, VIEWPORT_HEIGHT-28), fps_text, RGBA_LIGHT_RED)
 
         return cover_display_area
 
@@ -361,11 +365,11 @@ class CarGame:
         '''
 
         if self.mark_reset:
-            self.reward = -1
+            self.reward = -1 * self.velocity / CAR_MAX_VELOCITY
         elif self.reached_goal:
             self.reward = 1
         else:
-            self.reward = 0.3 * fabs(self.velocity) / CAR_MAX_VELOCITY
+            self.reward = 0.2 * fabs(self.velocity) / CAR_MAX_VELOCITY
 
     def playing_game_loop(self):
         while True:
@@ -388,7 +392,7 @@ class CarGame:
             pygame.display.flip()
 
             if self.mark_reset == True:
-                self.reset_map()
+                self.reset()
 
     def get_state(self):
         '''
@@ -398,7 +402,7 @@ class CarGame:
 
         return self.state_buffer
 
-    def get_event_step(self, actions, info):
+    def get_event_step(self, actions: int, info):
         '''
         Advance the game environment by one step, applying the actions given.
         Any info given will be drawn to the screen
@@ -448,7 +452,7 @@ class CarGame:
 
         return (self.get_state(), self.reward, self.mark_reset, None)
 
-    def push_frame_to_buffer(self):
+    def push_frame_to_buffer(self) -> None:
         ''' Add a new frame to the end of the frame_buffer.
         Does not change overall length of buffer.'''
 
