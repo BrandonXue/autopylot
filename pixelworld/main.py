@@ -103,9 +103,8 @@ def main():
         map_file = argv[2]
 
     # Load a map based on filename from CLI args
-    map_loader = MapLoader()
     try:
-        game_map = map_loader.load(map_file)
+        game_map = MapLoader.load(map_file)
     except Exception as e:
         print(e)
         return

@@ -10,8 +10,8 @@ class GameKeys1:
     ''' 
     Game keys, one at a time.
     An encapsulation of pygame input functionality intended for games.
-    Game Keys, Ordered, Mutually Exclusive. If more than one WASD or Arrow Key
-    is pressed at roughly the same time, the latest pressed takes precedence.
+    If more than one WASD or Arrow Key is pressed at roughly the same time,
+    the latest pressed takes precedence.
     '''
 
     def __init__(self):

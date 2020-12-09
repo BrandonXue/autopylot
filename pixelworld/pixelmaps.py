@@ -14,13 +14,14 @@ class Map:
         self.num_player_spots = num_player_spots
 
 class MapLoader:
-    def __init__(self) -> None:
-        pass
+    ''' Used to load and interpret various file formats into a Map object. '''
 
-    def __has_extension(self, filepath: str, ext: str) -> bool:
+    @staticmethod
+    def __has_extension(filepath: str, ext: str) -> bool:
         return filepath.rfind(ext) == (len(filepath) - len(ext))
 
-    def load(self, filepath: str) -> Map:
+    @staticmethod
+    def load(filepath: str) -> Map:
         ''' 
         Load a file into a map.
 
@@ -31,16 +32,17 @@ class MapLoader:
         Raises Exception if map had any error loading.
         '''
 
-        if self.__has_extension(filepath, '.png'):
-            data, num_pits, num_pellets, num_player_spots = self.__load_png(filepath)
-        elif self.__has_extension(filepath, '.txt'):
-            data, num_pits, num_pellets, num_player_spots = self.__load_txt(filepath)
+        if MapLoader.__has_extension(filepath, '.png'):
+            data, num_pits, num_pellets, num_player_spots = MapLoader.__load_png(filepath)
+        elif MapLoader.__has_extension(filepath, '.txt'):
+            data, num_pits, num_pellets, num_player_spots = MapLoader.__load_txt(filepath)
         else:
             raise Exception("Map format not supported. Supported types:\n\t.png\t.txt")
 
         return Map(data, num_pits, num_pellets, num_player_spots)
 
-    def __check_dimensions(self, data) -> None:
+    @staticmethod
+    def __check_dimensions(data) -> None:
         ''' Make sure the given 2D List is not empty and rows have same length.'''
 
         if len(data) == 0:
@@ -48,8 +50,9 @@ class MapLoader:
         cols = len(data[0])
         if not all (len(row) == cols for row in data):
             raise Exception("The map source had uneven rows.")
-            
-    def __load_png(self, filepath: str):
+
+    @staticmethod    
+    def __load_png(filepath: str):
         ''' Load a .png into a Map'''
 
         data = []
@@ -91,11 +94,12 @@ class MapLoader:
                     )
             data.append(row_data)
 
-        self.__check_dimensions(data)
+        MapLoader.__check_dimensions(data)
         
         return data, num_pits, num_pellets, num_player_spots
         
-    def __load_txt(self, filepath: str):
+    @staticmethod
+    def __load_txt(filepath: str):
         ''' Load a .txt file into a Map. '''
 
         data = []
@@ -129,6 +133,6 @@ class MapLoader:
                 if len(row_data) > 0: # Ignore empty rows
                     data.append(row_data)
 
-        self.__check_dimensions(data)
+        MapLoader.__check_dimensions(data)
 
         return data, num_pits, num_pellets, num_player_spots

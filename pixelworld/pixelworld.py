@@ -18,7 +18,7 @@ class Entity:
         self.__y = y
         self.__size = size
         self.color = color
-        self.bounds = world_bounds
+        self.__bounds = world_bounds
         
     def get_x(self)->int:
         return self.__x
@@ -28,11 +28,11 @@ class Entity:
 
     def move_x(self, spaces: int=1) -> None:
         self.__x += spaces
-        self.__x = clamp(self.__x, self.bounds.left, self.bounds.right)
+        self.__x = clamp(self.__x, self.__bounds.left, self.__bounds.right)
 
     def move_y(self, spaces: int=1) -> None:
         self.__y += spaces
-        self.__y = clamp(self.__y, self.bounds.top, self.bounds.bottom)
+        self.__y = clamp(self.__y, self.__bounds.top, self.__bounds.bottom)
 
     def draw(self, surface: pygame.Surface) -> None:
         draw.rect(
@@ -64,7 +64,7 @@ class PixelWorld:
         '''
 
         # Logical units
-        self.world_bounds = Rect(0, 0, game_map.width, game_map.height)
+        self.__world_bounds = Rect(0, 0, game_map.width, game_map.height)
         self.data_surf = pygame.Surface( (game_map.width, game_map.height) )
 
         # Display units
@@ -108,11 +108,11 @@ class PixelWorld:
                 x, y = col, row
                 if self.map.data[row][col] == PixelWorld.PLAYER:
                     self.start_pos = (x, y)
-                    self.player = Entity(x, y, self.scale, PixelWorld.PLAYER_COLOR, self.world_bounds)
+                    self.player = Entity(x, y, self.scale, PixelWorld.PLAYER_COLOR, self.__world_bounds)
                 elif self.map.data[row][col] == PixelWorld.PELLET:
-                    self.pellets.append(Entity(x, y, self.scale, PixelWorld.PELLET_COLOR, self.world_bounds))
+                    self.pellets.append(Entity(x, y, self.scale, PixelWorld.PELLET_COLOR, self.__world_bounds))
                 elif self.map.data[row][col] == PixelWorld.PIT:
-                    self.pits.append(Entity(x, y, self.scale, PixelWorld.PIT_COLOR, self.world_bounds))
+                    self.pits.append(Entity(x, y, self.scale, PixelWorld.PIT_COLOR, self.__world_bounds))
 
     def reset(self):
         '''

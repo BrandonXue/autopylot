@@ -1,8 +1,6 @@
 # Non-local modules
-import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.models import load_model
+from tensorflow.keras import layers, models
 
 class DeepQLearner:
     def __init__(self, env, input_shape):
@@ -12,11 +10,14 @@ class DeepQLearner:
     def __create_optimizer(self):
         # https://ruder.io/optimizing-gradient-descent/index.html#adam
         # Nesterov-accelerated Adaptive Moment Estimation
-        pass
+        optimizer = keras.optimizers.Nadam(
+            learning_rate=0.001
+        )
+        return optimizer
     
 
     def __create_model(self):
-        model = tf.keras.Sequential([
+        model = keras.Sequential([
             layers.Conv2D(
                 8, 5, strides=(1, 1), activation='relu', 
                 input_shape=self.input_shape,               # specified in constructor
