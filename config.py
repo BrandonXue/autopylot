@@ -93,7 +93,7 @@ CAR_VELOCITY_DECAY = {
 }[CURRENT_USER]
 
 CAR_ANGULAR_ACCELERATION = {
-    'Brandon Xue': 0.01,
+    'Brandon Xue': 0.02,
     'Jacob Rapmund': 0.004 #0.001
 }[CURRENT_USER]
 
@@ -119,16 +119,16 @@ KEY_ARRAY_SIZE = {
 }[CURRENT_USER]
 
 FRAME_RATE = {
-    'Brandon Xue': 60,
+    'Brandon Xue': 30,
     'Jacob Rapmund': 120
 }[CURRENT_USER]
 
 GRAYSCALE_DIM = {
-    'Brandon Xue': 80,
+    'Brandon Xue': 55,
     'Jacob Rapmund': 80
 }[CURRENT_USER]
 
 NUMBER_OF_DOTS = {
-    'Brandon Xue': 20,
+    'Brandon Xue': 40,
     'Jacob Rapmund': 20
 }[CURRENT_USER]

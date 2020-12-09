@@ -47,7 +47,7 @@ class CarGame:
         # Display related
         self.display = pygame.display.set_mode(
             VIEWPORT_SIZE,
-            pygame.DOUBLEBUF | pygame.HWSURFACE #| pygame.FULLSCREEN
+            pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.FULLSCREEN
         )
         self.display.set_alpha(None)
 
@@ -79,7 +79,7 @@ class CarGame:
         self.learning_fc = 0 # model frame count
         self.points = 0
         self.reward = 0
-        self.rotation = 0.0
+        self.rotation = 180.0
         self.angular_velocity = 0.0 # Can think of this as steering wheel position
         self.velocity = 0.0
 
@@ -94,9 +94,10 @@ class CarGame:
 
         # Fill the buffer with four of the initial screen to make sure all non null
         if self.game_mode == 'train':
-            self.state_buffer = [] 
-            for iteration in range(4):
-                self.state_buffer.append(self.get_processed_frame())
+            self.state_buffer = self.get_processed_frame()
+            for iteration in range(3):
+                self.state_buffer = np.dstack( (self.state_buffer, self.get_processed_frame()) )
+                # self.state_buffer.append(self.get_processed_frame())
         
     def load_map_from_file(self, filepath: str) -> None:
         in_file = open(filepath) # default read only
@@ -136,9 +137,9 @@ class CarGame:
             temp_pool.remove(location)
             self.goal_rects.append(
                 GoalRectangle(
-                    (location[0] * MAX_BOX_WIDTH) + (MAX_BOX_WIDTH - 60) / 2,
-                    (location[1] * MAX_BOX_HEIGHT) + (MAX_BOX_HEIGHT - 60) / 2, 
-                    60, 60, RGB_BLACK, RGB_WHITE
+                    (location[0] * MAX_BOX_WIDTH) + (MAX_BOX_WIDTH - 80) / 2,
+                    (location[1] * MAX_BOX_HEIGHT) + (MAX_BOX_HEIGHT - 80) / 2, 
+                    80, 80, RGB_BLACK, RGB_WHITE
                 )
             )
 
@@ -313,20 +314,8 @@ class CarGame:
             self.key_list[pygame.K_s] = True
             self.key_list[pygame.K_d] = True
 
-        elif actions == 4: # left
-            self.key_list[pygame.K_w] = False
-            self.key_list[pygame.K_a] = True
-            self.key_list[pygame.K_s] = False
-            self.key_list[pygame.K_d] = False
-
-        elif actions == 5: # right
-            self.key_list[pygame.K_w] = False
-            self.key_list[pygame.K_a] = False
-            self.key_list[pygame.K_s] = False
-            self.key_list[pygame.K_d] = True
-
     def draw_observation(self, pixels) -> None:
-        pygame.surfarray.blit_array(self.cover_display, pixels)
+        pygame.surfarray.blit_array(self.cover_display, pixels[:, :, :3])
 
     def draw_play_dashboard(self) -> None:
         points_text = f"Points: {self.points:.2f}"
@@ -357,19 +346,12 @@ class CarGame:
         self.learning_fc = info[2] # frame count
 
     def calc_reward(self):
-        ''' Ideas: 
-        Punish indecisiveness (flip-flopping inputs)
-        Punish idleness (low velocity for extended durations of time)
-        Heavily punish crashing (when collision == True)
-        Reward exploration (reward cumulative velocity magnitude)
-        '''
-
         if self.mark_reset:
-            self.reward = -1 * self.velocity / CAR_MAX_VELOCITY
+            self.reward = -1
         elif self.reached_goal:
             self.reward = 1
         else:
-            self.reward = 0.2 * fabs(self.velocity) / CAR_MAX_VELOCITY
+            self.reward = 0
 
     def playing_game_loop(self):
         while True:
@@ -399,7 +381,6 @@ class CarGame:
         Get a state from the game environment
         Returns only observations.
         '''
-
         return self.state_buffer
 
     def get_event_step(self, actions: int, info):
@@ -440,7 +421,7 @@ class CarGame:
 
         # Now update dashboard
         self.set_dashboard_info(info)
-        self.draw_observation(self.state_buffer[2])
+        self.draw_observation(self.state_buffer)
         dashboard_area = self.draw_train_dashboard()
 
         self.calc_reward() # Update reward based on previous actions
@@ -456,9 +437,8 @@ class CarGame:
         ''' Add a new frame to the end of the frame_buffer.
         Does not change overall length of buffer.'''
 
-        # Append a new frame
-        self.state_buffer.append(self.get_processed_frame())
-        del self.state_buffer[:1]
+        discarded_frame, self.state_buffer = np.dsplit(self.state_buffer, [1])
+        self.state_buffer = np.dstack( (self.state_buffer, self.get_processed_frame()) )
 
     def get_processed_frame(self):
         ''' Return a snapshot of the current display after processing. '''

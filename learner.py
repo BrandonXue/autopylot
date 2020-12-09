@@ -26,26 +26,28 @@ class DQN:
         self.car_game = car_game_
 
     def create_q_model(self) -> keras.Model:
-        # Network defined by the Deepmind paper
-        inputs = layers.Input(shape=(4, 80, 80, 1))
+        # Treating the frames as channels
+        # As long as the information is there, it should work
+        inputs = layers.Input(shape=(55, 55, 4))
 
-        # Convolutions on the frames on the screen
-        layer1 = layers.Conv2D(32, 3, strides=2, activation="relu")(inputs)
-        layer2 = layers.Conv2D(64, 5, strides=3, activation="relu")(layer1)
+        # Convolution layers to detect features of the environment
+        layer1 = layers.Conv2D(32, 7, strides=4, activation="relu")(inputs) # output 13x13
+        layer2 = layers.Conv2D(64, 4, strides=3, activation="relu")(layer1) # output 4x4
+        # Flatten before Dense layer
         layer3 = layers.Flatten()(layer2)
-        layer4 = layers.Dense(256, activation="relu")(layer3)
-        layer5 = layers.Dense(256, activation="relu")(layer4)
-        action = layers.Dense(self.num_actions, activation="tanh")(layer5)
+        # Dense layer to use feature maps to approximate Q-values
+        layer4 = layers.Dense(512, activation="relu")(layer3)
+        action = layers.Dense(self.num_actions, activation="tanh")(layer4)
 
         model = keras.Model(inputs=inputs, outputs=action)
         return model
 
 
     def set_training_config(self) -> None:
-        self.num_actions = 8
-        self.solve_threshold = 4000
-        self.gamma = 0.99           # Discount factor for past rewards
-        self.epsilon = 1.0          # Epsilon greedy parameter
+        self.num_actions = 6 # F, FL, FR, B, BL, BR
+        self.solve_threshold = 10000
+        self.gamma = 0.99           # Discount factor for future rewards
+        self.epsilon = 1.0          # Epsilon for exploration
         self.epsilon_min = 0.1      # Minimum for epsilon greedy parameter
         self.epsilon_max = 1.0      # Maximum epsilon greedy parameter
 
@@ -77,7 +79,6 @@ class DQN:
             print('Model not loaded. Created new model')
         else:
             print('Model loaded successfully.')
-        print(self.model.summary())
 
         # Build a target model for the prediction of future rewards.
         # The weights of a target model get updated every 10000 steps thus when the
@@ -137,9 +138,8 @@ class DQN:
         episode_count = 0
         frame_count = 0
 
-        # In the Deepmind paper they use RMSProp however then Adam optimizer
-        # improves training time
-        self.optimizer = keras.optimizers.Adam(learning_rate=0.00025, clipnorm=1.0)
+        # learning_rate 0.00025
+        self.optimizer = keras.optimizers.Adam(learning_rate=0.00026, clipnorm=1.0)
         
         # Using huber loss for stability
         self.loss_function = keras.losses.Huber()
@@ -154,11 +154,9 @@ class DQN:
 
                 # Use epsilon-greedy for exploration
                 if frame_count < self.epsilon_random_frames or self.epsilon > np.random.rand(1)[0]:
-                    # Take random action
-                    action = np.random.choice(self.num_actions)
+                    action = np.random.choice(self.num_actions) # Random action
                 else:
-                    # Predict action Q-values
-                    # From environment state
+                    # Predict action Q-values from environment state
                     state_tensor = tf.convert_to_tensor(state)
                     state_tensor = tf.expand_dims(state_tensor, 0)
                     action_probs = self.model(state_tensor, training=False)

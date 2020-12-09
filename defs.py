@@ -10,6 +10,7 @@ RGB_DARK_GRAY = (130, 130, 130)
 RGB_GREEN = (0, 255, 0)
 RGB_RED = (255, 0, 0)
 RGB_GOLD = (255, 215, 0)
+RGB_YELLOW = (255,255,0)
 
 # RGBA Color values
 RGBA_CLEAR = (0, 0, 0, 0)
