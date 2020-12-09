@@ -68,11 +68,19 @@ def start_training(do_save: bool, game_map: Map) -> None:
         # print(np.array(pygame.surfarray.pixels3d(pix.data_surf)).T) # diagnostic only
 
 def print_hint() -> None:
+    ''' Command line hints/help '''
     print(
-        'Usage:\n\n'
-        f'python3 {argv[0]} -h | --help\n'
-        f'python3 {argv[0]} train [--save] map_file\n'
-        f'python3 {argv[0]} play map_file'
+        '\nUsage:\n'
+        f"python3 {argv[0]} -h | --help\n"
+        f"python3 {argv[0]} train [--save] map_file\n"
+        f"python3 {argv[0]} play map_file\n\n"
+
+        ".txt maps can have spaces or empty lines.\n"
+        "empty = 0, pit = 1, pellet= 2, player spawn = 3\n\n"
+
+        ".png maps should be in three channel colors.\n"
+        "The folors are as follows (in RGB):\n"
+        "empty = 0xFFFFFF, pit = 0x000000, pellet= 0x0000FF, player spawn = 0x00FF00"
     )
 
 def main():
@@ -83,7 +91,7 @@ def main():
         print_hint()
         return
     else:
-        print('Unknown command.', end=' ')
+        print('Unrecognized command. Please check your spelling.', end=' ')
         print_hint()
         return
 
