@@ -43,6 +43,10 @@ DQLConfig = namedtuple(
         # Defines the size of a mini-batch takes from experience replay memory.
         # The authors of DeepMind used 32.
         'batch_size',
+
+        # Defines the frequency (once per this many frames)
+        # it takes for a target model update to occur
+        'C',
     ]
 )
 
@@ -110,7 +114,7 @@ class DeepQLearner:
         if len(self.action_mem) > self.config.mem_len:
             del self.action_mem[:1]
 
-        self.reward_mem.append(reward)
+        self.reward_mem.append(float(reward))
         if len(self.reward_mem) > self.config.mem_len:
             del self.reward_mem[:1]
 
@@ -132,7 +136,8 @@ class DeepQLearner:
             gamma=0.99,
             epsilon_anneal_frames=1000000,
             k=1,
-            batch_size=32
+            batch_size=32,
+            C=1000
         )
 
     def load(self, path_to_dir: str) -> None:
@@ -281,6 +286,10 @@ class DeepQLearner:
             pickle.dump(data, replay_file)
 
     def create_models(self):
+
+        # Two models are used:
+        # "The target net- work parameters are only updated with the Q-network parameters
+        # every C steps and are held fixed between individual updates"
         self.model = self.__create_model()
         self.target_model = self.__create_model()
 

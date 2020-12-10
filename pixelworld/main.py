@@ -15,7 +15,7 @@ import pygame.time
 from sys import argv
 
 PLAY_FRAME_RATE = 4
-TRAIN_FRAME_RATE = 120
+TRAIN_FRAME_RATE = 200
 
 def start_game(game_map: Map) -> None:
     # TODO: Setup the game and start the game loop
@@ -48,7 +48,11 @@ def start_game(game_map: Map) -> None:
             pix.reset()
 
 def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, game_map: Map) -> None:
-    ''' Please see Google DeepMind\'s paper: https://arxiv.org/pdf/1312.5602v1.pdf '''
+    ''' 
+    Please see Google DeepMind\'s paper: 
+    https://arxiv.org/pdf/1312.5602v1.pdf
+    https://storage.googleapis.com/deepmind-media/dqn/DQNNaturePaper.pdf
+    '''
 
     pix = PixelWorld(game_map)
 
@@ -83,6 +87,9 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
         
         frame = 0
         while frame < config.max_episode_frames:
+            frame += 1
+            total_frames += config.k 
+
             clock.tick(TRAIN_FRAME_RATE)    # Limit framerate for stability
 
             keys.grab_keys()                # Get inputs
@@ -108,49 +115,77 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
                 # DeepMind mentions how architecture of one Q-value per feedforward is inefficient
                 # Instead use architecture where Q-values of all actions are returned
                 # Instead of feeding image and action into network, only feed image.
-                action = argmax(action_values) # get the action with the highest Q-value
-                
+                action = np.argmax(action_values) # get the action with the highest Q-value
+
             # DeepMind's paper describes a frame-skipping technique.
             # Although this isn't applicable to our tiny pixel world (k = 1),
             # this training loop can be generalized to other games.
-            for skip in range(config.k):
-                frame += 1
-                total_frames += 1
-                # Update epsilon based on annealing schedule clamp to min
-                epsilon = max(config.epsilon_min, epsilon - epsilon_dec)
 
-                # Get remaining part of sequence with phi (preprocessing).
-                # Includes environment info (which is just to mimic the format of AIGym).
-                # Execute action at in emulator and observe reward r_t and image x_{t+1}
-                state_next, reward, done, info = pix.get_event_step(action)
-                state_next = dqn.preprocess(state_next)
+            # Update epsilon based on annealing schedule clamp to min
+            epsilon = max(config.epsilon_min, epsilon - epsilon_dec) #this shoud change on every set of k frames
 
-                # Store transition in replay history
-                dqn.add_transition(state, action, reward, state_next, done)
+            # Get remaining part of sequence with phi (preprocessing).
+            # Includes environment info (which is just to mimic the format of AIGym).
+            # Execute action at in emulator and observe reward r_t and image x_{t+1}
+            state_next, reward, done, info = pix.get_event_step(action, config.k) 
+            state_next = dqn.preprocess(state_next)
 
-                # Update current state
-                state = state_next
+            # Store transition in replay history
+            dqn.add_transition(state, action, reward, state_next, done)
+
+            # Update current state
+            state = state_next
 
             #update model (per frame) target by sampling minibatch of size 32 (default for training)
-            if frame > config.batch_size:
+            if (total_frames/config.k) > config.batch_size:
                 (state_sample, action_sample, reward_sample, 
                 state_next_sample, done_sample) = dqn.get_sample(config.batch_size)
 
-                #gradient tape
-                with tf.GradientTape() as tape:
-                    # Set y_j = r_j                                 for terminal φ_{j+1}
-                    # Set y_j = r_j + γ max_{a'} Q( φ_{j+1}, a′; θ) for non-terminal φ_{j+1}
-
-                    # q_preds = dqn.model(state_next_sample, training=False)
-                    # max_q = map(max, q_preds)
-                    # print(max_q)
-                    # if done
+                state_sample = tf.convert_to_tensor(state_sample)
+                state_next_sample = tf.convert_to_tensor(state_next_sample)
                 
+                # Set y_j = r_j for terminal φ_{j+1}
+                # Set y_j = r_j + γ max_{a'} Q( φ_{j+1}, a′; θ') for non-terminal φ_{j+1}
 
+                # Use this to mask out the Q predictions for terminal states
+                done_filter = [not done for done in done_sample]
+
+                # Q( φ_{j+1}, a′; θ')
+                q_pred_next = dqn.target_model.predict(state_next_sample, batch_size=config.batch_size)
+
+                # max_{a'} Q( φ_{j+1}, a′; θ')
+                max_q_next = tf.reduce_max( q_pred_next, axis=-1 )
+
+                # For terminal states, set this Q value to 0. Also decay all Q values
+                # γ max_{a'} Q( φ_{j+1}, a′; θ')
+                discounted_future_q = tf.Variable(dqn.config.gamma * max_q_next * done_filter)
+
+                # y_j
+                target_y = reward_sample + discounted_future_q
+                
+                # Use this to mask out Q predictions for actions we didn't take
+                mask = tf.one_hot(action_sample, pix.num_actions())
+
+                with tf.GradientTape() as tape:
+                    # Q*(a, s; θ)
+                    q_pred = tf.reduce_max(tf.multiply(dqn.model(state_sample, training=True), mask), axis=-1)
+
+                    loss = dqn.losses(target_y, q_pred)
+
+                gradients = tape.gradient(loss, dqn.model.trainable_variables)
+                dqn.opt.apply_gradients(zip(gradients, dqn.model.trainable_variables))
+
+                print(loss)
 
             #after large number of frames update model
-            
+            # Authors describe updating model after C steps
+            if (total_frames % config.C) == 0:
+                dqn.target_model.set_weights(dqn.model.get_weights()) 
             pix.render(show_data_surf=True)
+
+            if done:
+                break
+
             # print(np.array(pygame.surfarray.pixels3d(pix.data_surf)).T) # diagnostic only
 
 def print_hint() -> None:

@@ -170,10 +170,11 @@ class PixelWorld:
         '''
         return self.__done
 
-    def get_event_step(self, action=-1):
+    def get_event_step(self, action=-1, k=1):
         ''' 
-        Updates keras output state 
-        and
+        Updates keras output state with the given action, applying it k times.
+        If the simulation ends in any of the k frames, the last frame is replicated.
+        
         Returns feedback from the envrionment (state, reward, done, info)
         '''
 
@@ -194,7 +195,7 @@ class PixelWorld:
             pellet_y = self.pellets[i].get_y()
             if plyr_x == pellet_x and plyr_y == pellet_y:
                 self.__points += 1
-                reward = 1
+                reward = 1.0
                 self.pellets.pop(i)
             else:
                 self.data_surf.set_at((pellet_x + x_offset, pellet_y + y_offset), self.pellets[i].color)
@@ -204,7 +205,7 @@ class PixelWorld:
             pit_x = pit.get_x()
             pit_y = pit.get_y()
             if plyr_x == pit_x and plyr_y == pit_y:
-                reward = -1
+                reward = -1.0
                 self.__done = True
             else:
                 self.data_surf.set_at((pit.get_x() + x_offset, pit.get_y() + y_offset), pit.color)
