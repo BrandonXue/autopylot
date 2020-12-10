@@ -1,3 +1,6 @@
+# Local modules
+import utils
+
 # Non-local modules
 import cv2
 
@@ -17,10 +20,6 @@ class MapLoader:
     ''' Used to load and interpret various file formats into a Map object. '''
 
     @staticmethod
-    def __has_extension(filepath: str, ext: str) -> bool:
-        return filepath.rfind(ext) == (len(filepath) - len(ext))
-
-    @staticmethod
     def load(filepath: str) -> Map:
         ''' 
         Load a file into a map.
@@ -32,9 +31,9 @@ class MapLoader:
         Raises Exception if map had any error loading.
         '''
 
-        if MapLoader.__has_extension(filepath, '.png'):
+        if utils.has_extension(filepath, '.png'):
             data, num_pits, num_pellets, num_player_spots = MapLoader.__load_png(filepath)
-        elif MapLoader.__has_extension(filepath, '.txt'):
+        elif utils.has_extension(filepath, '.txt'):
             data, num_pits, num_pellets, num_player_spots = MapLoader.__load_txt(filepath)
         else:
             raise Exception("Map format not supported. Supported types:\n\t.png\t.txt")
@@ -107,7 +106,7 @@ class MapLoader:
         num_pellets = 0
         num_player_spots = 0
 
-        with open(filepath) as map_txt:
+        with open(filepath, 'r') as map_txt:
             lines = map_txt.readlines()
             for line in range(len(lines)):
                 row_data = []

@@ -5,14 +5,17 @@ from learner import DeepQLearner
 from pixelmaps import Map, MapLoader
 from pixelworld import PixelWorld
 
+
 # Non-local modules
+from random import random, randint
+import tensorflow as tf
+from tensorflow.python.keras.backend import argmax
 import numpy as np
 import pygame.time
 from sys import argv
 
 PLAY_FRAME_RATE = 4
 TRAIN_FRAME_RATE = 120
-RAW_WORLD_DIMENSIONS = (10, 10)
 
 def start_game(game_map: Map) -> None:
     # TODO: Setup the game and start the game loop
@@ -32,47 +35,130 @@ def start_game(game_map: Map) -> None:
         move = keys.get_move_key()  # See which movement to make (if any)
         # Advance game state
         if move == inputs.K_a:
-            done = pix.get_event_step(0)[2] # See docstring to see what numbers mean
+            pix.perform_action(0)# See docstring to see what numbers mean
         elif move == inputs.K_w:
-            done = pix.get_event_step(1)[2]
+            pix.perform_action(1)
         elif move == inputs.K_d:
-            done = pix.get_event_step(2)[2]
+            pix.perform_action(2)
         elif move == inputs.K_s:
-            done = pix.get_event_step(3)[2]
-        else:
-            done = False
+            pix.perform_action(3)
+
         # If game in terminal state, reset it
-        if done:
+        if pix.get_done():
             pix.reset()
 
-def start_training(do_save: bool, game_map: Map) -> None:
-    # TODO: Setup the game and start the training loop
+def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, game_map: Map) -> None:
+    ''' Please see Google DeepMind\'s paper: https://arxiv.org/pdf/1312.5602v1.pdf '''
+
     pix = PixelWorld(game_map)
 
     input_shape = game_map.dims + (3,)
-    dqn = DeepQLearner(pix, input_shape)
+    dqn = DeepQLearner(input_shape)
+    if do_load:
+        dqn.load(load_dir)
+    else:
+        dqn.set_config()
+        dqn.create_models()
+        dqn.create_optimizer()
+        dqn.create_losses()
+        dqn.create_replay_mem()
+
+    if do_save: # Check if save path is somewhat valid before we run training
+        dqn.try_save_path(save_dir)
 
     keys = QuitKeys()
     clock = pygame.time.Clock()
 
-    pix.reset()
-    while True:
-        clock.tick(TRAIN_FRAME_RATE)    # Limit framerate for stability
+    config = dqn.config
+    epsilon_dec = (config.epsilon_start - config.epsilon_min)/config.epsilon_anneal_frames
+    # epsilon = config.epsilon_start
+    epsilon = 0 # debug
 
-        keys.grab_keys()                # Get inputs
-        if keys.has_quit():             # See if game should quit
-            break
+    total_frames = 0
+    for episode in range(config.max_episodes):
+        # The deepmind authors used a phi function to preprocess sequences.
+        # For pixelworld we don't have sequences so our preprocess
+        state = pix.reset()
+        state = dqn.preprocess(state)
+        
+        frame = 0
+        while frame < config.max_episode_frames:
+            clock.tick(TRAIN_FRAME_RATE)    # Limit framerate for stability
 
-        pix.get_event_step(-1)
-        pix.render(show_data_surf=True)
-        # print(np.array(pygame.surfarray.pixels3d(pix.data_surf)).T) # diagnostic only
+            keys.grab_keys()                # Get inputs
+            if keys.has_quit():             # See if game should quit
+                if do_save:
+                    dqn.save(save_dir)
+                exit()
+            
+            # With probability ε select a random action a_t
+            if random() < epsilon:
+                action = randint(0, pix.num_actions() - 1)
+                
+            # otherwise select a_t = max_a Q*( φ(s_t), a; θ)
+            else:
+                # Need to convert state into a state tensor with batch size 1 for prediction at specific state
+                current_state_tf = tf.convert_to_tensor(state)
+                # We want to go from (width, height, rgbchannels) to (1, width, height, rgbchannels) so axis 0
+                current_state_tf = tf.expand_dims(current_state_tf, axis=0)
+
+                # __call__  (i.e. dqn.model()) is equivalent to model.predict()
+                # however it is recommended on smaller batch sizes to use __call__ 
+                action_values = dqn.model(current_state_tf, training=False)
+                # DeepMind mentions how architecture of one Q-value per feedforward is inefficient
+                # Instead use architecture where Q-values of all actions are returned
+                # Instead of feeding image and action into network, only feed image.
+                action = argmax(action_values) # get the action with the highest Q-value
+                
+            # DeepMind's paper describes a frame-skipping technique.
+            # Although this isn't applicable to our tiny pixel world (k = 1),
+            # this training loop can be generalized to other games.
+            for skip in range(config.k):
+                frame += 1
+                total_frames += 1
+                # Update epsilon based on annealing schedule clamp to min
+                epsilon = max(config.epsilon_min, epsilon - epsilon_dec)
+
+                # Get remaining part of sequence with phi (preprocessing).
+                # Includes environment info (which is just to mimic the format of AIGym).
+                # Execute action at in emulator and observe reward r_t and image x_{t+1}
+                state_next, reward, done, info = pix.get_event_step(action)
+                state_next = dqn.preprocess(state_next)
+
+                # Store transition in replay history
+                dqn.add_transition(state, action, reward, state_next, done)
+
+                # Update current state
+                state = state_next
+
+            #update model (per frame) target by sampling minibatch of size 32 (default for training)
+            if frame > config.batch_size:
+                (state_sample, action_sample, reward_sample, 
+                state_next_sample, done_sample) = dqn.get_sample(config.batch_size)
+
+                #gradient tape
+                with tf.GradientTape() as tape:
+                    # Set y_j = r_j                                 for terminal φ_{j+1}
+                    # Set y_j = r_j + γ max_{a'} Q( φ_{j+1}, a′; θ) for non-terminal φ_{j+1}
+
+                    # q_preds = dqn.model(state_next_sample, training=False)
+                    # max_q = map(max, q_preds)
+                    # print(max_q)
+                    # if done
+                
+
+
+            #after large number of frames update model
+            
+            pix.render(show_data_surf=True)
+            # print(np.array(pygame.surfarray.pixels3d(pix.data_surf)).T) # diagnostic only
 
 def print_hint() -> None:
     ''' Command line hints/help '''
     print(
         '\nUsage:\n'
         f"python3 {argv[0]} -h | --help\n"
-        f"python3 {argv[0]} train [--save] map_file\n"
+        f"python3 {argv[0]} train map_file [--save save_dir] [--load load_dir]\n"
         f"python3 {argv[0]} play map_file\n\n"
 
         ".txt maps can have spaces or empty lines.\n"
@@ -84,10 +170,13 @@ def print_hint() -> None:
     )
 
 def main():
-    # Parse CLI args
-    if argv[1] in {'train', 'play'}:
-        op_mode = argv[1]
-    elif argv[1] in {'-h', '--help'}:
+    argv_cp = argv # Make copy of CLI args
+    
+    # Get run mode
+    if argv_cp[1] in {'train', 'play'}:
+        op_mode = argv_cp[1]
+        argv_cp.remove(op_mode)
+    elif argv_cp[1] in {'-h', '--help'}:
         print_hint()
         return
     else:
@@ -95,12 +184,41 @@ def main():
         print_hint()
         return
 
-    do_save = '--save' in argv
-
-    if do_save:
-        map_file = argv[3]
+    # Get map
+    if len(argv_cp) > 1:
+        map_file = argv_cp[1]
+        argv_cp.remove(map_file)
     else:
-        map_file = argv[2]
+        print('Please specify map_file second.', end=' ')
+        print_hint()
+        return
+    
+    # Get save flags
+    try:
+        save_flag = argv_cp.index('--save')
+        do_save = True
+        save_dir = argv_cp[save_flag+1]
+        argv_cp.pop(save_flag+1)
+        argv_cp.remove('--save')
+    except:
+        do_save = False
+        save_dir = ''
+
+    # Get load flags
+    try:
+        load_flag = argv_cp.index('--load')
+        do_load = True
+        load_dir = argv_cp[load_flag+1]
+        argv_cp.pop(load_flag+1)
+        argv_cp.remove('--load')
+    except:
+        do_load = False
+        load_dir = ''
+        
+    if len(argv_cp) > 1:
+        print(f"Unknown arguments: {argv_cp[1:]}")
+        print_hint()
+        return
 
     # Load a map based on filename from CLI args
     try:
@@ -111,7 +229,7 @@ def main():
 
     # Launch training mode
     if op_mode == 'train':
-        start_training(do_save, game_map)
+        start_training(do_save, save_dir, do_load, load_dir, game_map)
     
     # Launch play mode
     elif op_mode == 'play':

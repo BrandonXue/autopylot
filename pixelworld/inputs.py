@@ -4,8 +4,6 @@ from pygame.constants import *
 
 # pygame constants will be accessible externally, e.g. inputs.K_w
 
-KEY_ARRAY_SIZE = 1024
-
 class GameKeys1:
     ''' 
     Game keys, one at a time.

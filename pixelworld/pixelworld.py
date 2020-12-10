@@ -2,7 +2,7 @@
 from pixelmaps import Map
 
 # Non-local modules
-from pygame import draw, Rect
+from pygame import draw, Rect, surfarray
 import pygame.locals
 
 def clamp(value: float, min: float, max: float) -> float:
@@ -48,6 +48,7 @@ class Entity:
 
 class PixelWorld:
     # Entity Types
+    EMPTY = 0
     PIT = 1
     PELLET = 2
     PLAYER = 3
@@ -87,7 +88,8 @@ class PixelWorld:
         self.pellets = []
 
         # Metrics
-        self.points = 0
+        self.__points = 0
+        self.__done = False
 
     def set_map(self, map_: Map) -> None:
         '''
@@ -128,9 +130,10 @@ class PixelWorld:
         self.__load_map_to_arrays()
         
         # Reset metrics
-        self.points = 0
+        self.__points = 0
+        self.__done = False
 
-        return self.data_surf
+        return self.get_event_step()[0]
 
     def num_actions(self) -> int:
         ''' 
@@ -140,12 +143,10 @@ class PixelWorld:
 
         return 4 # Left, Up, Right, Down
 
-    def get_event_step(self, action: int):
-        ''' 
+    def perform_action(self, action: int):
+        '''
         Apply an action to the environment.
         Left = 0, Up = 1, Right = 2, Down = 3. Stay put = -1.
-
-        Returns feedback from the envrionment (state, reward, done, info)
 
         Raises Exception if action could not be interpreted.
         '''
@@ -163,6 +164,21 @@ class PixelWorld:
         else:
             raise Exception("The action inputted was invalid: " + str(action))
 
+    def get_done(self):
+        '''
+        Useful for human players
+        '''
+        return self.__done
+
+    def get_event_step(self, action=-1):
+        ''' 
+        Updates keras output state 
+        and
+        Returns feedback from the envrionment (state, reward, done, info)
+        '''
+
+        self.perform_action(action)
+
         # Update the data surface (state)
         self.data_surf.fill(PixelWorld.EMPTY_COLOR)
         plyr_x = self.player.get_x()
@@ -171,13 +187,13 @@ class PixelWorld:
         y_offset = self.center_pos[1] - plyr_y
 
         reward = 0
-        done = False
 
         i = 0
         while i < len(self.pellets):
             pellet_x = self.pellets[i].get_x()
             pellet_y = self.pellets[i].get_y()
             if plyr_x == pellet_x and plyr_y == pellet_y:
+                self.__points += 1
                 reward = 1
                 self.pellets.pop(i)
             else:
@@ -189,14 +205,14 @@ class PixelWorld:
             pit_y = pit.get_y()
             if plyr_x == pit_x and plyr_y == pit_y:
                 reward = -1
-                done = True
+                self.__done = True
             else:
                 self.data_surf.set_at((pit.get_x() + x_offset, pit.get_y() + y_offset), pit.color)
         
         self.data_surf.set_at(self.center_pos, self.player.color)
         
         # Return (state, reward, done, info)
-        return (self.data_surf, reward, done, None)
+        return (surfarray.array3d(self.data_surf), reward, self.__done, None)
 
     def render(self, show_data_surf=False) -> None:
         # Update the game surface
