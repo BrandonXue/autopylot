@@ -75,8 +75,7 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
 
     config = dqn.config
     epsilon_dec = (config.epsilon_start - config.epsilon_min)/config.epsilon_anneal_frames
-    # epsilon = config.epsilon_start
-    epsilon = 0 # debug
+    epsilon = config.epsilon_start
 
     total_frames = 0
     for episode in range(config.max_episodes):
@@ -109,6 +108,7 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
                 # We want to go from (width, height, rgbchannels) to (1, width, height, rgbchannels) so axis 0
                 current_state_tf = tf.expand_dims(current_state_tf, axis=0)
 
+                print(current_state_tf.numpy().shape)
                 # __call__  (i.e. dqn.model()) is equivalent to model.predict()
                 # however it is recommended on smaller batch sizes to use __call__ 
                 action_values = dqn.model(current_state_tf, training=False)
