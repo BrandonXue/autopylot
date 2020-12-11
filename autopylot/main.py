@@ -4,7 +4,7 @@ import learner
 import filter_viz
 
 # SESSION CONFIG
-GAME_MODE = 'play'
+GAME_MODE = 'train'
 MODEL_NAME = 'saves/learner_model'
 TARGET_MODEL_NAME = 'saves/learner_target_model'
 EXP_REPLAY_NAME = 'saves/learner_replay.data'
