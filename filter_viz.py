@@ -3,7 +3,6 @@ from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
 from math import ceil, floor
 
-
 class Visualizer:
     def __init__(self, model_name, target_model_name) -> None:
         self.loaded = True

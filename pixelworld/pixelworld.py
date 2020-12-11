@@ -1,3 +1,11 @@
+# Authors:
+# Brandon Xue       brandonx@csu.fullerton.edu
+# Jacob Rapmund     jacobwrap86@csu.fullerton.edu
+#
+# This module contains the pixelworld environment.
+# The environment represents the game state and provides
+# interfaces for interacting with it.
+
 # Local modules
 from pixelmaps import Map
 

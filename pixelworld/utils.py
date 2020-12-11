@@ -1,3 +1,9 @@
+# Authors:
+# Brandon Xue       brandonx@csu.fullerton.edu
+# Jacob Rapmund     jacobwrap86@csu.fullerton.edu
+#
+# This module contains some basic utilities.
+
 def has_extension(filepath: str, ext: str) -> bool:
     ''' Check if the given file path has the given extension. '''
     return filepath.rfind(ext) == (len(filepath) - len(ext))

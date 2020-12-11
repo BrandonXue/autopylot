@@ -126,9 +126,20 @@ class DQN:
         del self.action_history[:1]
         del self.done_history[:1]
 
-    # !!!!NOTE: Code from online: Keras Atari breakout example
+    # !!!NOTE: Code from online: Keras Atari breakout example
     # https://keras.io/examples/rl/deep_q_network_breakout/
     # By authors: Jacob Chapman and Mathias Lechner
+    # Please note that we adapted the algorithm from this webpage for our use
+    #
+    # Note to Dr. Panangadan, we continued to research Deep Q-Learning throughout
+    # this project:
+    # 
+    # We weren't satisfied with our initial level of understanding,
+    # so we created a sub-project: pixelworld.
+    # We do not claim credit for the algorithm used here in the car game,
+    # but we implemented the same algorithm in pixelworld fully based on
+    # reading Keras APIs and reading the DeepMind paper.
+    # Please see the subdirectory pixelworld!
     def run_q_model_test(self) -> None:
         """Run the training. If mode is 'pipe', video data will be collected by piping
         from the car_game process. If mode is 'mss', video data will be collected by

@@ -1,4 +1,14 @@
-# Local modules
+# Authors:
+# Brandon Xue       brandonx@csu.fullerton.edu
+# Jacob Rapmund     jacobwrap86@csu.fullerton.edu
+#
+# This module contains functionality for generating a
+# deep reinforcement learning agent.
+# The neural network models are defined here.
+# Functionality for serializing stateful components are
+# also in this module.
+
+#  Local modules
 import utils
 
 # Non-local modules
@@ -331,7 +341,7 @@ class DeepQLearner:
 
         model = keras.Sequential([
             layers.Conv2D(
-                8,  # number of filters / depth of output feature map
+                32,  # number of filters / depth of output feature map
                 5,  # kernel size / size of convolutional matrix
                 strides=(1, 1), # how much kernel slides over each convolution
                 activation='relu', # DeepMind describes using ReLU for their convolutional layers
@@ -339,7 +349,7 @@ class DeepQLearner:
                 data_format='channels_last'     # (w, h, channels)
             ),
             layers.Conv2D(
-                16, # number of filters / depth of output feature map
+                64, # number of filters / depth of output feature map
                 3,  # kernel size / size of convolutional matrix
                 strides=(1, 1), activation='relu',
                 data_format='channels_last'

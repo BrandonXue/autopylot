@@ -1,3 +1,10 @@
+# Authors:
+# Brandon Xue       brandonx@csu.fullerton.edu
+# Jacob Rapmund     jacobwrap86@csu.fullerton.edu
+#
+# This module contains encapsulations for handling keyboard
+# inputs and event. It uses pygame's functionality.
+
 # Non-local modules
 import pygame.event
 from pygame.constants import * 

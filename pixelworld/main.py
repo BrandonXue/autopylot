@@ -1,3 +1,11 @@
+# Authors:
+# Brandon Xue       brandonx@csu.fullerton.edu
+# Jacob Rapmund     jacobwrap86@csu.fullerton.edu
+#
+# This module acts as the driver for our program,
+# and also handles command-line input.
+# The game loops and training loop both happen here.
+
 # Local modules
 import inputs
 from inputs import GameKeys1, QuitKeys
@@ -5,11 +13,9 @@ from learner import DeepQLearner
 from pixelmaps import Map, MapLoader
 from pixelworld import PixelWorld
 
-
 # Non-local modules
 from random import random, randint
 import tensorflow as tf
-from tensorflow.python.keras.backend import argmax
 import numpy as np
 import pygame.time
 from sys import argv
@@ -79,15 +85,15 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
 
     total_frames = 0
     for episode in range(config.max_episodes):
-        # The deepmind authors used a phi function to preprocess sequences.
-        # For pixelworld we don't have sequences so our preprocess
+        # Before every new episode, reset the environment
         state = pix.reset()
+        # The deepmind authors used a phi function to preprocess sequences.
         state = dqn.preprocess(state)
         
         frame = 0
         while frame < config.max_episode_frames:
-            frame += 1
-            total_frames += config.k 
+            frame += 1                      # frames since start of current episode
+            total_frames += config.k        # frames since start of first episode
 
             clock.tick(TRAIN_FRAME_RATE)    # Limit framerate for stability
 
@@ -97,18 +103,17 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
                     dqn.save(save_dir)
                 exit()
             
-            # With probability ε select a random action a_t
+            # With probability ε select a random action a_t     Exploration
             if random() < epsilon:
                 action = randint(0, pix.num_actions() - 1)
                 
-            # otherwise select a_t = max_a Q*( φ(s_t), a; θ)
+            # otherwise select a_t = max_a Q*( φ(s_t), a; θ)    Exploitation
             else:
                 # Need to convert state into a state tensor with batch size 1 for prediction at specific state
                 current_state_tf = tf.convert_to_tensor(state)
                 # We want to go from (width, height, rgbchannels) to (1, width, height, rgbchannels) so axis 0
                 current_state_tf = tf.expand_dims(current_state_tf, axis=0)
 
-                print(current_state_tf.numpy().shape)
                 # __call__  (i.e. dqn.model()) is equivalent to model.predict()
                 # however it is recommended on smaller batch sizes to use __call__ 
                 action_values = dqn.model(current_state_tf, training=False)
@@ -133,51 +138,64 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
             # Store transition in replay history
             dqn.add_transition(state, action, reward, state_next, done)
 
-            # Update current state
-            state = state_next
+            state = state_next # Update current state
 
             #update model (per frame) target by sampling minibatch of size 32 (default for training)
             if (total_frames/config.k) > config.batch_size:
+                # This returns a batch for each component of the experience replay memory
+                # The indices that the batches were sampled from all correspond to each other
                 (state_sample, action_sample, reward_sample, 
                 state_next_sample, done_sample) = dqn.get_sample(config.batch_size)
 
+                # Convert the states / sequences into tensors because
+                # we will use them to predict Q values in the model and calculate a loss.
                 state_sample = tf.convert_to_tensor(state_sample)
                 state_next_sample = tf.convert_to_tensor(state_next_sample)
                 
-                # Set y_j = r_j for terminal φ_{j+1}
-                # Set y_j = r_j + γ max_{a'} Q( φ_{j+1}, a′; θ') for non-terminal φ_{j+1}
+                # The next steps calculate y_j, the "true" Q-value of the current state
+                # y_j = r_j                                     for terminal φ_{j+1}
+                # y_j = r_j + γ max_{a'} Q( φ_{j+1}, a′; θ')    for non-terminal φ_{j+1}
 
-                # Use this to mask out the Q predictions for terminal states
-                done_filter = [not done for done in done_sample]
+                # This is the "true" Q-values of the next state: Q( φ_{j+1}, a′; θ')
+                q_next = dqn.target_model.predict(state_next_sample, batch_size=config.batch_size)
 
-                # Q( φ_{j+1}, a′; θ')
-                q_pred_next = dqn.target_model.predict(state_next_sample, batch_size=config.batch_size)
+                # We only need the maximum Q-value: max_{a'} Q( φ_{j+1}, a′; θ')
+                max_q_next = tf.reduce_max( q_next, axis=-1 )
 
-                # max_{a'} Q( φ_{j+1}, a′; θ')
-                max_q_next = tf.reduce_max( q_pred_next, axis=-1 )
+                # And these should be set to 0 if the state they were calculated from is terminal
+                done_mask = [not done for done in done_sample] # Create the mask
+                max_q_next = tf.multiply(max_q_next, done_mask)
 
-                # For terminal states, set this Q value to 0. Also decay all Q values
-                # γ max_{a'} Q( φ_{j+1}, a′; θ')
-                discounted_future_q = tf.Variable(dqn.config.gamma * max_q_next * done_filter)
+                # Now apply the future discount, gamma: γ max_{a'} Q( φ_{j+1}, a′; θ^-)
+                discounted_q_next = tf.multiply(max_q_next, dqn.config.gamma)
 
-                # y_j
-                target_y = reward_sample + discounted_future_q
+                # Now add reward to get y_j from the piecewise function above.
+                y_j = reward_sample + discounted_q_next
                 
-                # Use this to mask out Q predictions for actions we didn't take
-                mask = tf.one_hot(action_sample, pix.num_actions())
+                # Create a mask used to set Q predictions of actions we didn't take to zero.
+                action_mask = tf.one_hot(action_sample, pix.num_actions())
 
-                with tf.GradientTape() as tape:
-                    # Q*(a, s; θ)
-                    q_pred = tf.reduce_max(tf.multiply(dqn.model(state_sample, training=True), mask), axis=-1)
+                # Use gradient tape for auto-differentiation
+                with tf.GradientTape(persistent=False, watch_accessed_variables=True) as tape:
+                    # Q predictions of all actions at current state: Q*(a, s; θ) for all a
+                    all_q_pred = dqn.model(state_sample, training=True)
+                    # Mask predictions of actions that weren't taken based on action memory
+                    masked_q_pred = tf.multiply(all_q_pred, action_mask)
 
-                    loss = dqn.losses(target_y, q_pred)
+                    # Reduce rank producing just the predicted Q values of actions we took: Q*(a, s; θ)
+                    # Their loss should be compared to y_j, the "true" value of Q at this state.
+                    q_pred = tf.reduce_sum(masked_q_pred, axis=-1)
 
+                    # Compute the loss with our loss function.
+                    loss = dqn.losses(y_j, q_pred)
+
+                # Now find all the gradients to the parameters using recorded differentials.
                 gradients = tape.gradient(loss, dqn.model.trainable_variables)
+                print(gradients)
+                # Backpropagate by using our optimizer function.
                 dqn.opt.apply_gradients(zip(gradients, dqn.model.trainable_variables))
 
-                print(loss)
-
-            #after large number of frames update model
+            # After a predetermined number of frames update model
             # Authors describe updating model after C steps
             if (total_frames % config.C) == 0:
                 dqn.target_model.set_weights(dqn.model.get_weights()) 

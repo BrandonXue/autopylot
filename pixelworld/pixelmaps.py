@@ -1,3 +1,12 @@
+# Authors:
+# Brandon Xue       brandonx@csu.fullerton.edu
+# Jacob Rapmund     jacobwrap86@csu.fullerton.edu
+#
+# This module contains functionality for map loaders and Map objects.
+# This allows users to define the layout of an environment in
+# external files.
+# Currently supported formats are: .png .txt
+
 # Local modules
 import utils
 
