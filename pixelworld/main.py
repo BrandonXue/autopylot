@@ -65,7 +65,11 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
     input_shape = game_map.dims + (3,)
     dqn = DeepQLearner(input_shape)
     if do_load:
-        dqn.load(load_dir)
+        try:
+            dqn.load(load_dir)
+        except Exception as e:
+            print(e)
+            return
     else:
         dqn.set_config()
         dqn.create_models()
@@ -74,7 +78,8 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
         dqn.create_replay_mem()
 
     if do_save: # Check if save path is somewhat valid before we run training
-        dqn.try_save_path(save_dir)
+        if DeepQLearner.try_save_path(save_dir):
+            print('Save path verified.')
 
     keys = QuitKeys()
     clock = pygame.time.Clock()
@@ -100,7 +105,10 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
             keys.grab_keys()                # Get inputs
             if keys.has_quit():             # See if game should quit
                 if do_save:
-                    dqn.save(save_dir)
+                    try:
+                        dqn.save(save_dir)
+                    except Exception as e:
+                        print(e)
                 exit()
             
             # With probability ε select a random action a_t     Exploration
@@ -191,7 +199,6 @@ def start_training(do_save: bool, save_dir: str, do_load: bool, load_dir: str, g
 
                 # Now find all the gradients to the parameters using recorded differentials.
                 gradients = tape.gradient(loss, dqn.model.trainable_variables)
-                print(gradients)
                 # Backpropagate by using our optimizer function.
                 dqn.opt.apply_gradients(zip(gradients, dqn.model.trainable_variables))
 

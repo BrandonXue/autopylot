@@ -8,14 +8,11 @@
 # Functionality for serializing stateful components are
 # also in this module.
 
-#  Local modules
-import utils
-
 # Non-local modules
 from collections import namedtuple
 import numpy as np
 import os
-import pathlib
+from pathlib import Path
 import pickle
 from tensorflow import keras
 from tensorflow.keras import layers, models
@@ -179,9 +176,9 @@ class DeepQLearner:
             raise Exception("Experience replay memory already initialized.")
 
         # Make sure directory is correct
-        if not os.path.exists(path_to_dir):
-            raise Exception("Could not find the target subdirectory.")
-        path_to_dir = utils.add_trailing_slash(path_to_dir)
+        path = Path(path_to_dir)
+        if (not path.exists()) or (not path.is_dir()):
+            raise Exception("Could not find the target directory to load.")
 
         DeepQLearner.__load_helper(self, path_to_dir) # Everything ok, load
 
@@ -189,22 +186,21 @@ class DeepQLearner:
     def __load_helper(learner: 'DeepQLearner', path_to_dir: str):
         ''' To be called only when subdirectory has been created and is the cwd.'''
 
-        with open(path_to_dir + 'config.dat', 'rb') as config_file:
+        path = Path(path_to_dir)
+
+        with open( path/Path('config.dat'), 'rb') as config_file:
             learner.config = pickle.load(config_file)
 
-        learner.model = models.load_model(path_to_dir + 'model', compile=False)
-        learner.target_model = models.load_model(path_to_dir + 'target_model', compile=False)
-        # with open('models.dat', 'rb') as model_file:
-        #     learner.model = pickle.load(model_file)
-        #     learner.target_model = pickle.load(model_file)
+        learner.model = models.load_model( path/Path('model'), compile=False)
+        learner.target_model = models.load_model( path/Path('target_model'), compile=False)
             
-        with open(path_to_dir + 'opt.dat', 'rb') as opt_file:
+        with open( path/Path('opt.dat'), 'rb') as opt_file:
             learner.opt = pickle.load(opt_file)
 
-        with open(path_to_dir + 'loss.dat', 'rb') as loss_file:
+        with open( path/Path('loss.dat'), 'rb') as loss_file:
             learner.losses = pickle.load(loss_file)
 
-        with open(path_to_dir + 'replay.dat', 'rb') as replay_file:
+        with open( path/Path('replay.dat'), 'rb') as replay_file:
             data = pickle.load(replay_file)
             learner.state_mem = data['State Memory']
             learner.action_mem = data['Action Memory']
@@ -221,12 +217,20 @@ class DeepQLearner:
         May raise Exception if path is invalid.
         '''
 
-        parent_path, child_dir = utils.find_parent_child(path_to_dir)
-        if not os.path.exists(parent_path):
-            return False
-        elif not os.path.exists(path_to_dir):
-            os.mkdir(path_to_dir)
-        return True
+        path = Path(path_to_dir)
+        # If path already exists
+        if path.exists():
+            # If it's a directory, it can be saved in
+            if path.is_dir():
+                return True
+        # Else, trry to create a directory with the same name
+        try:
+            Path(path).mkdir(parents=False, exist_ok=False)
+            return True
+        # If parent doesn't exist, unreachable
+        except FileNotFoundError:
+            print("The parent directory to the path you specified does not exist.")
+            return 
 
     def save(self, path_to_dir: str) -> None:
         ''' 
@@ -256,32 +260,27 @@ class DeepQLearner:
         if type(None) == type(self.state_mem): # Replay Memory
             raise Exception("Experience replay memory not initialized.")
 
-        parent_path, child_dir = utils.find_parent_child(path_to_dir)
-        if not os.path.exists(parent_path):
-            raise Exception("Could not find destination path for saving.")
+        if DeepQLearner.try_save_path(path_to_dir):
+            DeepQLearner.__save_helper(self, path_to_dir) # Everything okay, save
 
-        elif not os.path.exists(path_to_dir):
-            os.mkdir(path_to_dir)
-
-        path_to_dir = utils.add_trailing_slash(path_to_dir)
-
-        DeepQLearner.__save_helper(self, path_to_dir) # Everything okay, save
 
 
     @staticmethod
     def __save_helper(learner: 'DeepQLearner', path_to_dir: str):
         ''' To be called only when subdirectory has been created and is the cwd.'''
 
-        with open(path_to_dir + 'config.dat', 'wb') as config_file:
+        path = Path(path_to_dir)
+
+        with open( path/Path('config.dat'), 'wb') as config_file:
             pickle.dump(learner.config, config_file)
 
-        learner.model.save(path_to_dir + 'model', include_optimizer=False)
-        learner.target_model.save(path_to_dir + 'target_model', include_optimizer=False)
+        learner.model.save( path/Path('model'), include_optimizer=False)
+        learner.target_model.save( path/Path('target_model'), include_optimizer=False)
             
-        with open(path_to_dir + 'opt.dat', 'wb') as opt_file:
+        with open( path/Path('opt.dat'), 'wb') as opt_file:
             pickle.dump(learner.opt, opt_file)
 
-        with open(path_to_dir + 'loss.dat', 'wb') as loss_file:
+        with open( path/Path('loss.dat'), 'wb') as loss_file:
             pickle.dump(learner.losses, loss_file)
 
         data = {
@@ -292,7 +291,7 @@ class DeepQLearner:
             'Done Memory': learner.done_mem
         }
 
-        with open(path_to_dir + 'replay.dat', 'wb') as replay_file:
+        with open( path/Path('replay.dat'), 'wb') as replay_file:
             pickle.dump(data, replay_file)
 
     def create_models(self):
