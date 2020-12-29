@@ -132,3 +132,5 @@ dmypy.json
 .DS_Store
 .gitignore
 .vs*
+saves/
+*DS_Store
